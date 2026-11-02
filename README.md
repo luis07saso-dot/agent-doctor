@@ -134,7 +134,7 @@ if result and result.live:
     ...  # hire it
 ```
 
-Allow up to about 45 seconds. Use `live_probe=False` for a profile-only answer in about a second. Run one check at a time per `ctx` (replies are matched by session).
+Allow up to about 45 seconds. Use `live_probe=False` for a profile-only answer, usually in about a second. Run one check at a time per `ctx` (replies are matched by session).
 
 If you send no address or @handle, Agent Doctor asks which agent to check. A mistyped address gets a "copy it again" reply, not a wrong report.
 
