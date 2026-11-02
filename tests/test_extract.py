@@ -142,3 +142,53 @@ def test_bare_own_address_is_still_a_self_audit():
 
 def test_other_address_mention_is_still_a_target():
     assert addrs(f"audit @{STRONG}", **ME) == [STRONG]
+
+
+# M2: a handle typed WITHOUT "@" right after an audit word. In a new ASI:One chat an
+# @handle can route the message to that agent instead of us (docs/smoke-test.md), so users
+# can drop the "@". Only hyphenated, handle-shaped tokens count, so plain words never do.
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("audit agent-listing-generator", "agent-listing-generator"),
+        ("@agent-doctor audit agent-listing-generator", "agent-listing-generator"),
+        (f"@{SELF} audit agent-listing-generator", "agent-listing-generator"),
+        ("Can you check the agent weather-bot-2?", "weather-bot-2"),
+        ("review handle: crypto-whale-radar please", "crypto-whale-radar"),
+        ("Audit Agent-Listing-Generator.", "agent-listing-generator"),
+        ("check out trip-planner", "trip-planner"),
+    ],
+)
+def test_bare_handle_after_audit_word(text, expected):
+    assert handles(text, **ME) == [expected]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "audit my agent",
+        "audit the agent please",
+        "check agentbuilder",  # no hyphen: too close to a plain word
+        "agent-listing-generator is great",  # no audit word before it
+        "I love well-known agents",
+        "check my-site.com",
+        "check https://example.com/foo-bar",
+        "check foo_bar-baz",
+        "audit foo-",
+        "audit -foo-bar",
+    ],
+)
+def test_bare_handle_not_read_from_plain_text(text):
+    ex = extract(text, **ME)
+    assert ex.targets == ()
+    assert not ex.bad_address
+
+
+def test_bare_own_handle_after_audit_word_is_a_self_audit():
+    # "@agent-doctor" is ASI:One's mention of us; a typed "agent-doctor" is a request.
+    assert handles("audit agent-doctor", **ME) == ["agent-doctor"]
+    assert handles("@agent-doctor audit agent-doctor", **ME) == ["agent-doctor"]
+
+
+def test_bare_and_at_handle_deduped():
+    assert handles("audit weather-bot, i.e. @weather-bot", **ME) == ["weather-bot"]

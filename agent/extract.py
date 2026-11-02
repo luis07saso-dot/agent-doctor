@@ -3,6 +3,9 @@
 Accepted target forms (anywhere in a sentence; ASI:One often rewrites messages):
 - address:  agent1q... (bech32, checksum verified)
 - handle:   @some-handle (lowercased; emails like a@b.com are ignored)
+            or a hyphenated handle WITHOUT "@" right after an audit word
+            ("audit agent-listing-generator"): in a new ASI:One chat an @handle can route
+            the message to that agent instead of us (docs/smoke-test.md).
 - URL:      any URL containing an address, e.g.
             https://agentverse.ai/agents/details/agent1q.../profile
             or an agentverse.ai / asi1.ai URL with an @handle path segment.
@@ -30,6 +33,15 @@ _HANDLE_HOSTS = ("agentverse.ai", "asi1.ai")
 # backtracking to a shorter prefix), then validated against the Agentverse handle pattern,
 # so "@foo_bar", "@foo-" and "@example.com" are rejected rather than read as "@foo".
 _HANDLE = re.compile(r"(?<![A-Za-z0-9._%+\-/@])@([A-Za-z0-9_-]++)(?!@|\.[A-Za-z0-9])")
+# Bare handle: audit word, up to 3 filler words, then a hyphenated handle-shaped token (no
+# "@": @handles are step 3). Hyphen required so plain words ("audit agentbuilder", "check
+# this") are never read as handles. Token not glued to "_", "@", "-" or a ".tld".
+_BARE_HANDLE = re.compile(
+    r"\b(?:audit|check|scan|review|score|rate|grade|analy[sz]e|diagnose|inspect|test)\b"
+    r"(?:[\s:,]+(?:the|this|that|my|our|out|agent|handle|called|named|please|on|agentverse)\b){0,3}"
+    r"[\s:,]+([a-z0-9]++(?:-[a-z0-9]++)++)(?![A-Za-z0-9_@-]|\.[A-Za-z0-9])",
+    re.IGNORECASE,
+)
 _URL_HANDLE = re.compile(r"/@([A-Za-z0-9_-]++)(?=[/?#]|$)")
 _TRAILING_PUNCT = ".,;:!?)]}>'\"`*_"
 
@@ -104,6 +116,11 @@ def extract(text: str, ignore_handles: Iterable[str] = (),
     # 3. Bare @handles in the remaining text.
     for m in _HANDLE.finditer(masked_text):
         _add_handle(found, m.start(), m.group(1), ignore)
+
+    # 4. Bare handles after an audit word. Not filtered by `ignore`: ASI:One adds
+    #    "@agent-doctor", but a typed "audit agent-doctor" is a real self-audit request.
+    for m in _BARE_HANDLE.finditer(masked_text):
+        _add_handle(found, m.start(1), m.group(1), set())
 
     found.sort(key=lambda p: p[0])
     seen: set[Target] = set()
