@@ -8,6 +8,7 @@ Usage (from the repo root; --pull needs SSH, so run with the sandbox off):
     .venv/bin/python scripts/metrics.py --pull     # copy events from the VPS, then report
     .venv/bin/python scripts/metrics.py            # report from data/events.log
     .venv/bin/python scripts/metrics.py --file x   # report from another copy
+    .venv/bin/python scripts/metrics.py --sessions # also print guard budget per chat session
 Rewrites only the block between the markers in docs/metrics.md, so re-runs never duplicate.
 Exit code 2 = an outage alert in the newest day of data.
 
@@ -55,6 +56,12 @@ STREAK_ALERT_S = 30 * 60
 HEARTBEAT_ALERT_S = 90 * 60  # heartbeat every 3600 s; one missed beat + margin
 ERROR_OUTCOMES = {"api_down", "timeout", "fallback", "prehire_error"}
 PROTOCOL = "prehire_protocol"
+# Mirror of agent/guard.py (tests keep them equal). The guard counts only messages it let
+# through, per (sender, session), in memory: a restart (START) resets it.
+GUARD_HOURLY_CAP = 20
+GUARD_DAILY_CAP = 50
+GUARD_NOT_COUNTED = {"dropped", "rate_limited", "repeat"}  # guard said no
+GUARD_SKIPPED_INPUTS = {"control", "non_text", PROTOCOL}  # never reach the guard
 
 
 @dataclass(frozen=True)
@@ -310,12 +317,72 @@ def pull(dest: Path = EVENTS) -> None:
     tmp.replace(dest)
 
 
+def guard_budget(events: list[Event], now: datetime | None = None) -> list[dict]:
+    """Per chat session since the last restart: replies the guard counted in the last hour /
+    24 h and what is left before it silences the session for 24 h. Use before each Testing
+    batch. Log time ~ reply time (the guard counts at receipt, up to 15 s earlier).
+    Over-counts blank-text messages (logged like a normal help reply, not guard-checked)."""
+    if not events:
+        return []
+    now = now or events[-1].ts
+    starts = [e.ts for e in events if e.kind == "START"]
+    since = max(starts) if starts else events[0].ts
+    hour, day = now - timedelta(hours=1), now - timedelta(days=1)
+    sessions: dict[tuple, dict] = {}
+    for e in events:
+        if e.kind != "REQ" or e.ts < since or e.data.get("input") in GUARD_SKIPPED_INPUTS:
+            continue
+        key = (e.data.get("sender", "?"), e.data.get("session", "?"))
+        s = sessions.setdefault(key, {"sender": key[0], "session": key[1], "times": [],
+                                      "held": Counter(), "first": e.ts, "last": e.ts})
+        s["last"] = e.ts
+        out = e.data.get("outcome")
+        if out in GUARD_NOT_COUNTED:
+            s["held"][out] += 1
+        else:
+            s["times"].append(e.ts)
+    rows = []
+    for s in sessions.values():
+        times = s.pop("times")
+        in_day = [t for t in times if t > day]
+        # Busiest rolling hour in the last 2 days: once it hit the cap, the next message
+        # trips a 24 h silence (or already did).
+        recent = [t for t in times if t > now - timedelta(days=2)]
+        peak = max((sum(1 for u in recent if t <= u < t + timedelta(hours=1)) for t in recent),
+                   default=0)
+        tripped = peak >= GUARD_HOURLY_CAP or len(in_day) >= GUARD_DAILY_CAP
+        s.update(hour=sum(1 for t in times if t > hour), day=len(in_day), tripped=tripped,
+                 held=dict(s["held"]))
+        s["hour_left"] = 0 if tripped else GUARD_HOURLY_CAP - s["hour"]
+        s["day_left"] = 0 if tripped else GUARD_DAILY_CAP - s["day"]
+        rows.append(s)
+    rows.sort(key=lambda r: r["last"], reverse=True)
+    return rows
+
+
+def render_budget(rows: list[dict], exclude: dict[str, str]) -> str:
+    if not rows:
+        return "Guard budget: no chat sessions since the last restart."
+    out = ["Guard budget since last restart (caps: %d/h, %d/24 h per session; at cap = silent 24 h)"
+           % (GUARD_HOURLY_CAP, GUARD_DAILY_CAP),
+           "sender       session  last (UTC)        1h  24h  left/h  left/24h  held  who"]
+    for r in rows:
+        held = ",".join(f"{k}={v}" for k, v in sorted(r["held"].items())) or "-"
+        flag = "  TRIPPED/AT CAP" if r["tripped"] else ""
+        out.append(f"{r['sender']:<12} {r['session']:<8} {r['last']:%Y-%m-%d %H:%M}  "
+                   f"{r['hour']:>3} {r['day']:>4}  {r['hour_left']:>6}  {r['day_left']:>8}  "
+                   f"{held}  {exclude.get(r['sender'], '?')}{flag}")
+    return "\n".join(out)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--pull", action="store_true", help="copy the events file from the VPS first")
     ap.add_argument("--file", type=Path, default=EVENTS)
     ap.add_argument("--doc", type=Path, default=DOC)
     ap.add_argument("--exclude", type=Path, default=EXCLUDE)
+    ap.add_argument("--sessions", action="store_true",
+                    help="also print the guard budget per chat session (before Testing runs)")
     a = ap.parse_args(argv)
     if a.pull:
         pull(a.file)
@@ -331,6 +398,8 @@ def main(argv=None) -> int:
     for d, t in al:
         print(f"{d}: {t}")
     print(f"{len(events)} events -> {a.doc}")
+    if a.sessions:
+        print(render_budget(guard_budget(events, now), load_exclude(a.exclude)))
     return 2 if any(d == newest and t.startswith("ALERT") for d, t in al) else 0
 
 

@@ -250,3 +250,50 @@ def test_collector_output_parses(collector):
     run, _ = collector
     ev = m.parse_events(run())
     assert [e.kind for e in ev].count("MAILBOX_ERR") == 4 and ev[2].data["outcome"] == "ok"
+
+
+# ---------- guard budget per session (Testing runs) ----------
+
+def start(dt) -> str:
+    return f"{ts(dt)} START"
+
+
+def test_guard_budget_counts_answered_since_last_start():
+    lines = [
+        req(T0 - timedelta(hours=2)),                       # before restart: guard forgot it
+        start(T0 - timedelta(hours=1, minutes=30)),
+        req(T0 - timedelta(hours=1, minutes=10)),           # >1 h ago: day only
+        *[req(T0 - timedelta(minutes=i)) for i in range(1, 6)],
+        req(T0 - timedelta(minutes=7), outcome="dropped"),  # not counted by the guard
+        req(T0 - timedelta(minutes=8), outcome="rate_limited"),
+        req(T0 - timedelta(minutes=9), input="control", outcome="no_reply"),
+        req(T0 - timedelta(minutes=2), session="b"),
+        req(T0 - timedelta(minutes=3), input="prehire_protocol", outcome="live", session="p"),
+    ]
+    rows = m.guard_budget(m.parse_events(lines), now=T0)
+    a = next(r for r in rows if r["session"] == "a")
+    assert (a["hour"], a["day"], a["hour_left"], a["day_left"]) == (5, 6, 15, 44)
+    assert a["held"] == {"dropped": 1, "rate_limited": 1}
+    assert {r["session"] for r in rows} == {"a", "b"}  # protocol + control-only sessions skipped
+
+
+def test_guard_budget_flags_tripped_session():
+    lines = [start(T0 - timedelta(hours=2))]
+    lines += [req(T0 - timedelta(minutes=50) + timedelta(seconds=10 * i)) for i in range(20)]
+    lines += [req(T0 - timedelta(minutes=10), outcome="dropped")]
+    (r,) = m.guard_budget(m.parse_events(lines), now=T0)
+    assert r["hour_left"] == 0 and r["tripped"]
+
+
+def test_sessions_flag_prints_budget(tmp_path, capsys):
+    f = tmp_path / "events.log"
+    f.write_text("\n".join([start(T0), req(T0 + timedelta(minutes=1))]) + "\n")
+    assert m.main(["--file", str(f), "--doc", str(tmp_path / "m.md"), "--sessions"]) == 0
+    out = capsys.readouterr().out
+    assert "s1" in out and "19" in out
+
+
+def test_guard_mirror_matches_agent_guard():
+    from agent import guard
+    assert (m.GUARD_HOURLY_CAP, m.GUARD_DAILY_CAP) == (guard.SESSION_HOURLY_CAP,
+                                                       guard.SESSION_DAILY_CAP)
