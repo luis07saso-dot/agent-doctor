@@ -10,10 +10,11 @@ from agent.extract import Target, extract
 HELP = (
     "**Agent Doctor** audits any Agentverse agent and tells you how to rank higher "
     "on Agentverse and ASI:One.\n\n"
-    "Send an agent address or Agentverse profile link, e.g.:\n"
+    "Send an agent address, handle or Agentverse profile link, e.g.:\n"
     "- `audit agent1q...`\n"
+    "- `audit weather-bot` (handle, no @)\n"
     "- `https://agentverse.ai/agents/details/agent1q.../profile`\n\n"
-    "In ASI:One, paste the address or link: mentioning another agent's @handle may send "
+    "In ASI:One, leave out the @ before another agent's handle: an @handle may send "
     "your message to that agent instead.\n\n"
     "You get a 0-100 score, a verdict and the top 3 fixes (README, Chat Protocol, "
     "handle, avatar, status, rating, Testing and more). Free."
@@ -26,9 +27,9 @@ OFF_SCOPE = (
 )
 
 NEED_TARGET = (
-    "Which agent? I need its address (`agent1q...`) or Agentverse profile link. "
-    "I can't search by name yet.\n\n"
-    "Find it on agentverse.ai: open the agent, copy the address or the profile link."
+    "Which agent? I need its address (`agent1q...`), handle (`audit weather-bot`, no @) "
+    "or Agentverse profile link. I can't search by name yet.\n\n"
+    "Find it on agentverse.ai: open the agent, copy the address, handle or profile link."
 )
 
 BAD_ADDRESS = (

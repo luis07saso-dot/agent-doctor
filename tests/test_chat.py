@@ -360,9 +360,16 @@ OWN = "agent1qwm50eahtwxe2jsjnqqgj3yqmcrpft3rkd42g8frh9twvdwugazfg3897tp"
     (f"@{OWN} audit my agent", "need_target"),
     (f"@{OWN} audit {STRONG}", "audit"),
     (f"@{OWN} Audit {OWN}", "audit"),  # self-audit starter prompt, first message
+    (f"@{OWN} audit agent-listing-generator", "audit"),  # handle typed without "@" (M2)
 ])
 def test_classify_first_message_from_asi_one(text, kind):
     assert router.classify(text, ["agent-doctor"], [OWN]).kind == kind
+
+
+def test_classify_bare_handle_targets_that_agent():
+    intent = router.classify("@agent-doctor audit agent-listing-generator", ["agent-doctor"], [OWN])
+    assert intent.kind == "audit"
+    assert [t.label for t in intent.targets] == ["@agent-listing-generator"]
 
 
 def test_first_message_from_asi_one_gets_help_not_self_audit(monkeypatch):
