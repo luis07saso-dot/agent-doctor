@@ -10,9 +10,9 @@ URL. The result joins the static Agentverse data (Doctor's 0-100 profile score a
 Chat Protocol probe (agent/probe.py): `status` live | degraded | unreachable, ack_ms, reply_ms.
 
 The models carry NO docstrings or field descriptions on purpose: they are part of the schema
-digest, and clients copy these classes verbatim (examples/prehire_client.py). Any change to
-the models changes PROTOCOL_DIGEST: bump PROTOCOL_VERSION and update the client snippet
-(tests/test_prehire.py pins both).
+digest, and clients copy these classes verbatim (README "For agents" and
+examples/prehire_client.py). Any change to the models changes PROTOCOL_DIGEST: bump
+PROTOCOL_VERSION and update both client copies (tests/test_prehire.py pins all three).
 
 Humans reach the same check in chat: "pre-hire check <address/@handle>", "is <agent> live?".
 """
