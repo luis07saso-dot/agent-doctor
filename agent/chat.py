@@ -1,26 +1,123 @@
-"""Agent Chat Protocol: ack first, then always reply."""
+"""Agent Chat Protocol wiring: ack first, guard, route, reply, log one line per request.
+
+Log line (JSON after "REQ "): hashed sender, input type, outcome, latency. Never message
+bodies, never raw addresses of senders.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import time
+
 from uagents import Context, Protocol
-from uagents_core.contrib.protocols.chat import (
+from uagents_core.contrib.protocols.chat import (  # noqa: I001
     ChatAcknowledgement,
     ChatMessage,
+    ResourceContent,
     TextContent,
     chat_protocol_spec,
 )
 
-from agent.router import FALLBACK, route
+from agent import router, service
+from agent.agentverse import AgentverseClient
+from agent.guard import Guard
 
 chat_proto = Protocol(spec=chat_protocol_spec)
+
+MAX_TEXT_CHARS = 4000  # longer messages are cut (at a space) before routing
+
+CLIENT: service.LookupClient = AgentverseClient()
+GUARD = Guard()
+SELF_HANDLES: tuple[str, ...] = ("agent-doctor", "agent-doctor-dev")
+
+
+def configure(handle: str) -> None:
+    """Called from main with the running agent's handle (ignored when found in messages)."""
+    global SELF_HANDLES
+    SELF_HANDLES = tuple(dict.fromkeys((handle, "agent-doctor", "agent-doctor-dev")))
+
+
+def hash_id(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()[:12]
+
+
+def _session(ctx: Context) -> str:
+    try:
+        return str(ctx.session or "")
+    except Exception:
+        return ""
+
+
+def _cut(text: str) -> str:
+    if len(text) <= MAX_TEXT_CHARS:
+        return text
+    head = text[:MAX_TEXT_CHARS]
+    return head[: head.rfind(" ")] if " " in head else head  # don't split an address
+
+
+def log_request(ctx: Context, sender: str, input_type: str, outcome: str, started: float,
+                **extra) -> None:
+    rec = {
+        "sender": hash_id(sender),
+        "session": hash_id(_session(ctx))[:8],  # L8: tells us if ASI:One reuses sessions/senders
+        "input": input_type,
+        "outcome": outcome,
+        "latency_ms": int((time.monotonic() - started) * 1000),
+        **extra,
+    }
+    try:
+        ctx.logger.info("REQ " + json.dumps(rec, separators=(",", ":"), sort_keys=True))
+    except Exception:
+        pass  # logging must never break a reply
+
+
+async def _reply(ctx: Context, sender: str, text: str) -> None:
+    await ctx.send(sender, ChatMessage(content=[TextContent(text=text)]))
 
 
 @chat_proto.on_message(ChatMessage)
 async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
-    await ctx.send(sender, ChatAcknowledgement(acknowledged_msg_id=msg.msg_id))
+    started = time.monotonic()
     try:
-        reply = route(msg.text().strip())
-    except Exception:
-        ctx.logger.exception("route failed")
-        reply = FALLBACK
-    await ctx.send(sender, ChatMessage(content=[TextContent(text=reply)]))
+        await ctx.send(sender, ChatAcknowledgement(acknowledged_msg_id=msg.msg_id))
+    except Exception as e:  # still try to answer
+        ctx.logger.error(f"ack failed: {type(e).__name__}")
+
+    try:
+        text = _cut(msg.text().strip()).strip()
+        if not text:
+            if any(isinstance(c, ResourceContent) for c in msg.content):
+                await _reply(ctx, sender, router.NON_TEXT)
+                log_request(ctx, sender, "non_text", "non_text", started)
+            elif all(isinstance(c, TextContent) for c in msg.content) and msg.content:
+                await _reply(ctx, sender, router.HELP)  # blank text only, from a user
+                log_request(ctx, sender, "text", "help", started)
+            else:
+                # Session markers / metadata only: ack, no reply (matches the official example).
+                log_request(ctx, sender, "control", "no_reply", started)
+            return
+
+        decision = GUARD.check(sender, _session(ctx), text)
+        if decision == "drop":
+            log_request(ctx, sender, "text", "dropped", started)
+            return
+        if decision in ("warn", "repeat"):
+            await _reply(ctx, sender, router.RATE_LIMITED if decision == "warn" else router.REPEATED)
+            log_request(ctx, sender, "text", "rate_limited" if decision == "warn" else "repeat",
+                        started)
+            return
+
+        res = await service.handle(text, CLIENT, SELF_HANDLES)
+        await _reply(ctx, sender, res.text)
+        log_request(ctx, sender, res.input_type, res.outcome, started, targets=res.targets,
+                    via_url=res.via_url, cached=res.cached)
+    except Exception as e:
+        # Type name only: exception text could carry message content or URLs.
+        ctx.logger.error(f"chat handler failed: {type(e).__name__}")
+        try:
+            await _reply(ctx, sender, router.FALLBACK)
+        finally:
+            log_request(ctx, sender, "unknown", "fallback", started)
 
 
 @chat_proto.on_message(ChatAcknowledgement)
