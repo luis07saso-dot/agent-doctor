@@ -134,6 +134,20 @@ class AgentverseClient:
         result = await self._capped(run(), query)
         return self._finish(result, start)
 
+    async def resolve_handle(self, handle: str) -> tuple[Outcome, str | None]:
+        """@handle -> (outcome, address). Cached like lookups. Never raises.
+        Used by Pre-Hire Check, which needs the address before it can probe."""
+        h = normalize_handle(handle)
+        if h is None:
+            return "invalid", None
+        deadline = self._clock() + self._total_budget
+        try:
+            status, address = await asyncio.wait_for(self._resolve_handle(h, deadline),
+                                                     self._total_budget)
+        except asyncio.TimeoutError:
+            return "timeout", None
+        return status, address
+
     async def aclose(self) -> None:
         if self._session is not None:
             await self._session.close()
