@@ -85,13 +85,56 @@ Verdicts: **LIVE** (it answered), **DEGRADED** (it acknowledged but sent no answ
 
 Orchestrators and routers can ask Agent Doctor before they hire (call) another agent. Protocol `AgentDoctorPreHire` 0.1.0: send `PreHireRequest{address}`, get back `PreHireResult{status, live, ack_ms, reply_ms, chat_protocol, active, unresponsive_flag, rating, trust_score, checked_at, cached, detail, profile_url}`.
 
+Copy-paste client for your uAgent (uagents 0.25.5 or newer). Paste the two models exactly as they are: class names, fields, types and defaults define the schema digest Agent Doctor matches on.
+
 ```python
-result = await pre_hire_check(ctx, "agent1q...")   # copy-paste client: see below
+from typing import Optional
+from uagents import Context, Model
+
+AGENT_DOCTOR = "agent1qwm50eahtwxe2jsjnqqgj3yqmcrpft3rkd42g8frh9twvdwugazfg3897tp"
+
+
+class PreHireRequest(Model):
+    address: str
+    live_probe: bool = True
+
+
+class PreHireResult(Model):
+    query: str
+    address: str = ""
+    status: str
+    live: bool = False
+    detail: str = ""
+    chat_protocol: Optional[bool] = None
+    active: Optional[bool] = None
+    unresponsive_flag: Optional[bool] = None
+    rating: Optional[float] = None
+    trust_score: Optional[int] = None
+    ack_ms: Optional[int] = None
+    reply_ms: Optional[int] = None
+    checked_at: str = ""
+    cached: bool = False
+    profile_url: str = ""
+
+
+async def pre_hire_check(ctx: Context, agent: str, live_probe: bool = True,
+                         timeout: int = 45) -> Optional[PreHireResult]:
+    """None if Agent Doctor didn't answer within `timeout` seconds."""
+    reply, _status = await ctx.send_and_receive(
+        AGENT_DOCTOR, PreHireRequest(address=agent, live_probe=live_probe),
+        response_type=PreHireResult, timeout=timeout)
+    return reply if isinstance(reply, PreHireResult) else None
+```
+
+Use it before you hire (call) another agent:
+
+```python
+result = await pre_hire_check(ctx, "agent1q...")   # or "@handle"
 if result and result.live:
     ...  # hire it
 ```
 
-Copy-paste client (two models + one function): https://github.com/luis07saso-dot/hallo/blob/main/examples/prehire_client.py. Paste the two models exactly as they are (they define the schema digest). Allow up to about 45 seconds. Use `live_probe=False` for a profile-only answer in about a second.
+Allow up to about 45 seconds. Use `live_probe=False` for a profile-only answer in about a second. Run one check at a time per `ctx` (replies are matched by session).
 
 If you send no address or @handle, Agent Doctor asks which agent to check. A mistyped address gets a "copy it again" reply, not a wrong report.
 
