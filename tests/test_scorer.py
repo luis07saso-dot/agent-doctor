@@ -178,7 +178,11 @@ def test_rule_responsive():
 def test_rule_handle():
     assert with_(None, None).check("handle").ok
     assert not with_("handle", None).check("handle").ok
-    assert not with_("handle", "x" * 21).check("handle").ok
+    # Docs: a custom handle is the factor; 20 chars is the limit for setting one now.
+    # Older, longer handles still exist (e.g. @agent-listing-generator): they have one.
+    long = with_("handle", "agent-listing-generator").check("handle")
+    assert long.ok and long.fix == ""
+    assert not with_("handle", "").check("handle").ok
 
 
 def test_rule_avatar():
