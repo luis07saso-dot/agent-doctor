@@ -134,10 +134,12 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
             return
 
         res = await service.handle(text, CLIENT, SELF_HANDLES, SELF_ADDRESSES,
-                                   prehire=run_prehire)
+                                   prehire=run_prehire,
+                                   probe=lambda address: PROBER.probe(ctx, address))
         await _reply(ctx, sender, res.text)
+        extra = {"live": res.live} if res.live else {}
         log_request(ctx, sender, res.input_type, res.outcome, started, targets=res.targets,
-                    via_url=res.via_url, cached=res.cached, **meta)
+                    via_url=res.via_url, cached=res.cached, **extra, **meta)
     except Exception as e:
         # Type name only: exception text could carry message content or URLs.
         ctx.logger.error(f"chat handler failed: {type(e).__name__}")

@@ -311,9 +311,19 @@ def test_chat_prehire_without_target(chat_wired):
     assert chat_wired.calls == []
 
 
-def test_chat_audit_unchanged(chat_wired):
+def test_chat_audit_of_flagged_agent_runs_live_check(chat_wired):
+    """Q2 (user decisions Q2-D1/D2): flagged agent -> one probe, verdict in the same reply."""
+    (reply,), (req,) = say(f"audit {STRONG}")
+    assert "Score " in reply and req["outcome"] == "ok" and chat_wired.calls == [STRONG]
+    assert "Our live check just got a reply in 3.2s" in reply and "out of date" in reply
+    assert "We did not test it" not in reply and req["live"] == "live"
+
+
+def test_chat_audit_of_unflagged_agent_does_not_probe(monkeypatch, chat_wired):
+    monkeypatch.setattr(chat, "CLIENT", FakeClient(unresponsive=False))
     (reply,), (req,) = say(f"audit {STRONG}")
     assert "Score " in reply and req["outcome"] == "ok" and chat_wired.calls == []
+    assert "live" not in req
 
 
 @pytest.mark.parametrize("status,word", [("live", "LIVE"), ("degraded", "DEGRADED"),
