@@ -48,7 +48,7 @@ class Score:
             bad.append(Check("readme", 0.0, readme.max_points + sections.max_points, False,
                              readme.detail, "Write a Markdown README with sections: "
                              + ", ".join(R.README_SECTIONS)))
-        # Offline trumps everything: inactive agents are excluded from ranking entirely.
+        # Offline trumps everything: only active agents are considered in ranking.
         return tuple(sorted(bad, key=lambda c: (c.rule != "active", -c.lost, order.index(c.rule))))
 
     def check(self, rule: str) -> Check:
@@ -120,7 +120,8 @@ def _active(active: bool, profile: dict, almanac: dict, almanac_known: bool) -> 
     else:
         detail = str(almanac.get("status") or profile.get("status") or "unknown")
     return _mk("active", 0, detail,
-               "Bring the agent online and keep it running (inactive agents are excluded from ranking)")
+               "Bring the agent online and keep it running (only active agents are ranked; "
+               "inactive ones are pushed down)")
 
 
 def _chat_protocol(profile: dict, almanac: dict) -> Check:

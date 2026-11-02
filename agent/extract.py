@@ -167,6 +167,20 @@ def _add_handle(found: list, pos: int, raw: str, ignore: set[str], from_url: boo
     found.append((pos, Target("handle", h, from_url)))
 
 
+# Words that mark the next token as a handle ("my agent X", "handle is X", "called X"). Not
+# glued to a "-" before it, so the "-agent" inside "ticketlens-agent" anchors nothing.
+_ANCHOR = r"(?:(?<![\w-])(?:agent|bot|called|named)[\s:,]+|(?<![\w-])handle[\s:,]+(?:is[\s:,]+)?)"
+
+
+def handle_anchored(text: str, handle: str) -> bool:
+    """True if `handle` sits right after an anchor word, or is the whole message: then it is
+    clearly meant as a handle, and a miss should say "couldn't find" rather than be dropped."""
+    if text.strip(" \t\n.,!?:;'\"`*").lower() == handle:
+        return True
+    tok = re.escape(handle) + r"(?![A-Za-z0-9_@-]|\.[A-Za-z0-9])"
+    return re.search(_ANCHOR + tok, text, re.IGNORECASE) is not None
+
+
 def soft_handles(text: str, ignore_handles: Iterable[str] = ()) -> tuple[str, ...]:
     """First hyphenated handle-shaped token anywhere in `text`, as a 0/1-tuple. URLs, our own
     handles, common hyphenated words and number-only tokens ("2026-11-03", "24-7") never count."""
