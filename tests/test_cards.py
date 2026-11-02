@@ -292,3 +292,19 @@ def test_chat_click_json_then_logged_without_body():
     rec = ctx.reqs()[1]
     assert rec["click"] == "doctor_fix" and rec["outcome"] == "fix_guide"
     assert ADDR not in ctx.logs[1]
+
+
+# ---------- kill switch: AUDIT_CARDS=0 sends the same text with no card ----------
+
+@pytest.mark.parametrize("value,has_card", [("0", False), (" 0 ", False), ("1", True), ("", True)])
+def test_audit_cards_switch(monkeypatch, value, has_card):
+    on = ask(f"audit {ADDR}")
+    monkeypatch.setenv("AUDIT_CARDS", value)
+    res = ask(f"audit {ADDR}")
+    assert (res.card is not None) == has_card
+    assert res.text == on.text and res.outcome == "ok"
+
+
+def test_audit_cards_default_on(monkeypatch):
+    monkeypatch.delenv("AUDIT_CARDS", raising=False)
+    assert ask(f"audit {ADDR}").card is not None

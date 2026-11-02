@@ -9,6 +9,7 @@ unknown | not_found | invalid | error | pending) and prehire_need_target.
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Iterable, Optional, Protocol
@@ -141,7 +142,11 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
 
 
 def _card(name: str, address: str, sc: Any, top: Iterable[Any]) -> Optional[dict]:
-    """Q4 card for an audit reply. Never breaks the reply: any error -> no card."""
+    """Q4 card for an audit reply. Never breaks the reply: any error -> no card.
+    Kill switch: AUDIT_CARDS=0 in the VPS .env (push_env.sh, then recreate the container)
+    sends the same text with no card, without a rebuild. Read per reply."""
+    if os.getenv("AUDIT_CARDS", "1").strip() == "0":
+        return None
     try:
         url = PROFILE_URL.format(address=address) if address else ""
         payload = cards.audit_payload(name, address, sc.total, sc.verdict,
