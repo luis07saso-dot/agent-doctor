@@ -1,0 +1,23 @@
+# Lives at /opt/agent-doctor on the VPS next to .env (chmod 600) and .tag.
+# TAG = git short SHA of the deployed commit (see deploy/deploy.sh).
+services:
+  agent:
+    image: agent-doctor:${TAG:?TAG not set}
+    container_name: agent-doctor
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      RUN_MODE: prod
+      ENV_FILE: /nonexistent  # all config comes from env_file
+    ports:
+      - "127.0.0.1:8001:8001"  # local only; mailbox needs no inbound
+    volumes:
+      - agent-data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  agent-data:

@@ -1,0 +1,16 @@
+.env
+.env.*
+.git
+.venv
+.pytest_cache
+__pycache__
+*.pyc
+.DS_Store
+.claude
+screenshots
+research
+tests
+deploy
+scripts
+*.md
+!README.md
