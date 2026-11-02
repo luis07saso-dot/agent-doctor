@@ -21,16 +21,16 @@ _TOKEN = re.compile(
 _FULL_ADDR_LEN = 65
 
 
-def shape(text: str, self_address: str, self_handles: Iterable[str]) -> str:
+def shape(text: str, self_addresses: Iterable[str], self_handles: Iterable[str]) -> str:
     own_handles = {h.lower() for h in self_handles}
-    own_addr = self_address.lower()
+    own_addrs = {a.lower() for a in self_addresses if a}
 
     def sub(m: re.Match) -> str:
         if m.group("url"):
             return "<URL>"
         if m.group("addr"):
             a = m.group("addr").lower()
-            if a == own_addr:
+            if a in own_addrs:
                 return "<SELF>"
             return "<ADDR>" if len(a) == _FULL_ADDR_LEN else "<ADDR?>"
         if m.group("handle"):

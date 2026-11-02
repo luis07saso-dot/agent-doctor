@@ -19,7 +19,7 @@ from uagents_core.contrib.protocols.chat import (  # noqa: I001
     chat_protocol_spec,
 )
 
-from agent import router, service
+from agent import profile, router, service
 from agent.shape import shape
 from agent.agentverse import AgentverseClient
 from agent.guard import Guard
@@ -31,14 +31,16 @@ MAX_TEXT_CHARS = 4000  # longer messages are cut (at a space) before routing
 CLIENT: service.LookupClient = AgentverseClient()
 GUARD = Guard()
 SELF_HANDLES: tuple[str, ...] = ("agent-doctor", "agent-doctor-dev")
-SELF_ADDRESS = ""  # set by configure(); only used to mark it in the log shape
+# "@<one of these>" in a message is a mention of us (ASI:One adds it to a new chat's first
+# message), not an audit target. A bare own address is still audited (self-audit prompt).
+SELF_ADDRESSES: tuple[str, ...] = (profile.SELF_ADDRESS,)
 
 
 def configure(handle: str, address: str = "") -> None:
-    """Called from main with the running agent's handle (ignored when found in messages)."""
-    global SELF_HANDLES, SELF_ADDRESS
+    """Called from main with the running agent's handle and address."""
+    global SELF_HANDLES, SELF_ADDRESSES
     SELF_HANDLES = tuple(dict.fromkeys((handle, "agent-doctor", "agent-doctor-dev")))
-    SELF_ADDRESS = address
+    SELF_ADDRESSES = tuple(a for a in dict.fromkeys((address, profile.SELF_ADDRESS)) if a)
 
 
 def hash_id(value: str) -> str:
@@ -92,7 +94,7 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
         text = _cut(msg.text().strip()).strip()
         # Structure only (words masked): shows how ASI:One rewrites messages. Never the body.
         meta = {"types": ",".join(str(getattr(c, "type", "?")) for c in msg.content),
-                "shape": shape(text, SELF_ADDRESS, SELF_HANDLES)}
+                "shape": shape(text, SELF_ADDRESSES, SELF_HANDLES)}
         if not text:
             if any(isinstance(c, ResourceContent) for c in msg.content):
                 await _reply(ctx, sender, router.NON_TEXT)
@@ -115,7 +117,7 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
                         started, **meta)
             return
 
-        res = await service.handle(text, CLIENT, SELF_HANDLES)
+        res = await service.handle(text, CLIENT, SELF_HANDLES, SELF_ADDRESSES)
         await _reply(ctx, sender, res.text)
         log_request(ctx, sender, res.input_type, res.outcome, started, targets=res.targets,
                     via_url=res.via_url, cached=res.cached, **meta)

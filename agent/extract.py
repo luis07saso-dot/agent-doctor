@@ -57,12 +57,16 @@ def valid_checksum(address: str) -> bool:
     return hrp == "agent" and data is not None
 
 
-def extract(text: str, ignore_handles: Iterable[str] = ()) -> Extraction:
+def extract(text: str, ignore_handles: Iterable[str] = (),
+            ignore_addresses: Iterable[str] = ()) -> Extraction:
     """Targets in order of appearance, de-duplicated. `ignore_handles` = our own handles
-    (ASI:One may keep "@agent-doctor" in the forwarded message)."""
+    (ASI:One may keep "@agent-doctor" in the forwarded message). `ignore_addresses` = our own
+    addresses: "@<own address>" is a mention, not a target (ASI:One prepends it to the first
+    message of a new chat). A bare own address is still a target (self-audit)."""
     if not text:
         return Extraction()
     ignore = {h.lower().lstrip("@") for h in ignore_handles}
+    own = {a.lower() for a in ignore_addresses if a}
     found: list[tuple[int, Target]] = []
     bad = False
 
@@ -71,6 +75,9 @@ def extract(text: str, ignore_handles: Iterable[str] = ()) -> Extraction:
     url_spans = [m.span() for m in _URL.finditer(text)]
     for m in _ADDRESS.finditer(text):
         addr = m.group(0).lower()
+        if addr in own and m.start() > 0 and text[m.start() - 1] == "@":
+            good_spans.append(m.span())  # mention of us: neither a target nor a typo
+            continue
         if valid_checksum(addr):
             in_url = any(s <= m.start() < e for s, e in url_spans)
             found.append((m.start(), Target("address", addr, in_url)))

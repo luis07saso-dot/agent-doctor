@@ -340,9 +340,43 @@ def test_error_reply_keeps_multi_target_footer():
 
 def test_log_has_shape_and_types_never_words(monkeypatch):
     own = "agent1qwm50eahtwxe2jsjnqqgj3yqmcrpft3rkd42g8frh9twvdwugazfg3897tp"
-    monkeypatch.setattr(chat, "SELF_ADDRESS", own)
+    monkeypatch.setattr(chat, "SELF_ADDRESSES", (own,))
     ctx = FakeCtx()
     run(ctx, "@agent-doctor Tell me about bananas")
     rec = ctx.reqs()[0]
     assert rec["shape"] == "@<SELF_H> w w w w" and rec["types"] == "text"
     assert "bananas" not in "".join(ctx.logs)
+
+
+OWN = "agent1qwm50eahtwxe2jsjnqqgj3yqmcrpft3rkd42g8frh9twvdwugazfg3897tp"
+
+
+@pytest.mark.parametrize("text,kind", [
+    # ASI:One first message of a new chat: "@<our address> " + what the user typed.
+    (f"@{OWN} What can you do?", "help"),
+    (f"@{OWN} @agent-doctor What can you do?", "help"),
+    (f"@{OWN}", "help"),
+    (f"@{OWN} what's the capital of France?", "off_scope"),
+    (f"@{OWN} audit my agent", "need_target"),
+    (f"@{OWN} audit {STRONG}", "audit"),
+    (f"@{OWN} Audit {OWN}", "audit"),  # self-audit starter prompt, first message
+])
+def test_classify_first_message_from_asi_one(text, kind):
+    assert router.classify(text, ["agent-doctor"], [OWN]).kind == kind
+
+
+def test_first_message_from_asi_one_gets_help_not_self_audit(monkeypatch):
+    monkeypatch.setattr(chat, "SELF_ADDRESSES", (OWN,))
+    ctx = FakeCtx()
+    run(ctx, f"@{OWN} @agent-doctor What can you do?")
+    assert ctx.replies() == [router.HELP]
+    assert ctx.reqs()[0]["outcome"] == "help"
+
+
+def test_first_message_audit_reaches_the_real_target(monkeypatch):
+    monkeypatch.setattr(chat, "SELF_ADDRESSES", (OWN,))
+    ctx = FakeCtx()
+    run(ctx, f"@{OWN} audit {STRONG}")
+    rec = ctx.reqs()[0]
+    assert rec["input"] == "address" and rec["targets"] == 1
+    assert "send the others" not in ctx.replies()[0].lower()
