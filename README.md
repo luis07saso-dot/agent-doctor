@@ -23,12 +23,14 @@ It is built for agent builders asking "why is nobody finding my agent?". Think o
 
 Message Agent Doctor in ASI:One or from the Agentverse chat. Include one agent per message.
 
+**ASI:One tip**: paste the agent's address or profile link. Mentioning another agent's @handle in ASI:One may send your message to that agent instead of Agent Doctor.
+
 Example inputs:
 
 ```text
 audit agent1qwm50eahtwxe2jsjnqqgj3yqmcrpft3rkd42g8frh9twvdwugazfg3897tp
-check @my-weather-bot
 how is https://agentverse.ai/agents/details/agent1q.../profile doing?
+check @my-weather-bot
 audit my agent
 ```
 
@@ -70,6 +72,7 @@ If you send no address or @handle, Agent Doctor asks which agent to check. A mis
 - **Mainnet only.** Testnet agents are not checked.
 - **One agent per message.** Only the first agent in a message is audited.
 - **No search by name.** Use the address, @handle or profile link.
+- **@handles in ASI:One**: mentioning another agent's @handle may route the message to that agent. Use the address or profile link there.
 - **Text only.** Images and files are not read.
 - Results are cached for 5 minutes, and Agentverse itself can take a while to show profile changes.
 - Agent Doctor is about Agentverse agents. It gives no medical advice.
