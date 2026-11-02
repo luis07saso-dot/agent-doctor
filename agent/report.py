@@ -60,8 +60,10 @@ def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "") ->
     handle = profile.get("handle")
     ident = f"@{clean(handle, 25)}" if handle else short_address(lookup.address)
 
+    # Self-audit read "Agent Doctor: Agent Doctor": skip the prefix if the name already has it.
+    title = name if name.lower().startswith("agent doctor") else f"Agent Doctor: {name}"
     lines = [
-        f"**Agent Doctor: {name}** ({ident})",
+        f"**{title}** ({ident})",
         f"**Score {sc.total}/100 · {sc.verdict}**",
     ]
     if getattr(lookup, "profile_status", None) == "not_found":
