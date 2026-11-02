@@ -19,7 +19,7 @@ agent = Agent(
     publish_agent_details=True,  # profile is sent on mailbox /connect (deploy/connect.sh)
 )
 agent.include(chat_proto, publish_manifest=True)
-chat.configure(settings.handle)
+chat.configure(settings.handle, agent.address)
 
 
 @agent.on_event("shutdown")

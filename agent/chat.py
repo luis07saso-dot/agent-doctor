@@ -1,6 +1,7 @@
 """Agent Chat Protocol wiring: ack first, guard, route, reply, log one line per request.
 
-Log line (JSON after "REQ "): hashed sender, input type, outcome, latency. Never message
+Log line (JSON after "REQ "): hashed sender, input type, outcome, latency, content types and
+message shape (words masked, see agent/shape.py). Never message
 bodies, never raw addresses of senders.
 """
 from __future__ import annotations
@@ -19,6 +20,7 @@ from uagents_core.contrib.protocols.chat import (  # noqa: I001
 )
 
 from agent import router, service
+from agent.shape import shape
 from agent.agentverse import AgentverseClient
 from agent.guard import Guard
 
@@ -29,12 +31,14 @@ MAX_TEXT_CHARS = 4000  # longer messages are cut (at a space) before routing
 CLIENT: service.LookupClient = AgentverseClient()
 GUARD = Guard()
 SELF_HANDLES: tuple[str, ...] = ("agent-doctor", "agent-doctor-dev")
+SELF_ADDRESS = ""  # set by configure(); only used to mark it in the log shape
 
 
-def configure(handle: str) -> None:
+def configure(handle: str, address: str = "") -> None:
     """Called from main with the running agent's handle (ignored when found in messages)."""
-    global SELF_HANDLES
+    global SELF_HANDLES, SELF_ADDRESS
     SELF_HANDLES = tuple(dict.fromkeys((handle, "agent-doctor", "agent-doctor-dev")))
+    SELF_ADDRESS = address
 
 
 def hash_id(value: str) -> str:
@@ -78,6 +82,7 @@ async def _reply(ctx: Context, sender: str, text: str) -> None:
 @chat_proto.on_message(ChatMessage)
 async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
     started = time.monotonic()
+    meta: dict = {}
     try:
         await ctx.send(sender, ChatAcknowledgement(acknowledged_msg_id=msg.msg_id))
     except Exception as e:  # still try to answer
@@ -85,39 +90,42 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
 
     try:
         text = _cut(msg.text().strip()).strip()
+        # Structure only (words masked): shows how ASI:One rewrites messages. Never the body.
+        meta = {"types": ",".join(str(getattr(c, "type", "?")) for c in msg.content),
+                "shape": shape(text, SELF_ADDRESS, SELF_HANDLES)}
         if not text:
             if any(isinstance(c, ResourceContent) for c in msg.content):
                 await _reply(ctx, sender, router.NON_TEXT)
-                log_request(ctx, sender, "non_text", "non_text", started)
+                log_request(ctx, sender, "non_text", "non_text", started, **meta)
             elif all(isinstance(c, TextContent) for c in msg.content) and msg.content:
                 await _reply(ctx, sender, router.HELP)  # blank text only, from a user
-                log_request(ctx, sender, "text", "help", started)
+                log_request(ctx, sender, "text", "help", started, **meta)
             else:
                 # Session markers / metadata only: ack, no reply (matches the official example).
-                log_request(ctx, sender, "control", "no_reply", started)
+                log_request(ctx, sender, "control", "no_reply", started, **meta)
             return
 
         decision = GUARD.check(sender, _session(ctx), text)
         if decision == "drop":
-            log_request(ctx, sender, "text", "dropped", started)
+            log_request(ctx, sender, "text", "dropped", started, **meta)
             return
         if decision in ("warn", "repeat"):
             await _reply(ctx, sender, router.RATE_LIMITED if decision == "warn" else router.REPEATED)
             log_request(ctx, sender, "text", "rate_limited" if decision == "warn" else "repeat",
-                        started)
+                        started, **meta)
             return
 
         res = await service.handle(text, CLIENT, SELF_HANDLES)
         await _reply(ctx, sender, res.text)
         log_request(ctx, sender, res.input_type, res.outcome, started, targets=res.targets,
-                    via_url=res.via_url, cached=res.cached)
+                    via_url=res.via_url, cached=res.cached, **meta)
     except Exception as e:
         # Type name only: exception text could carry message content or URLs.
         ctx.logger.error(f"chat handler failed: {type(e).__name__}")
         try:
             await _reply(ctx, sender, router.FALLBACK)
         finally:
-            log_request(ctx, sender, "unknown", "fallback", started)
+            log_request(ctx, sender, "unknown", "fallback", started, **meta)
 
 
 @chat_proto.on_message(ChatAcknowledgement)

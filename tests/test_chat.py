@@ -336,3 +336,13 @@ def test_profile_fetch_failure_is_inconclusive_not_scored(status, reply):
 def test_error_reply_keeps_multi_target_footer():
     res = asyncio.run(service.handle("check @a and @b", FakeClient("not_found")))
     assert "couldn't find @a" in res.text and "1 more agent" in res.text
+
+
+def test_log_has_shape_and_types_never_words(monkeypatch):
+    own = "agent1qwm50eahtwxe2jsjnqqgj3yqmcrpft3rkd42g8frh9twvdwugazfg3897tp"
+    monkeypatch.setattr(chat, "SELF_ADDRESS", own)
+    ctx = FakeCtx()
+    run(ctx, "@agent-doctor Tell me about bananas")
+    rec = ctx.reqs()[0]
+    assert rec["shape"] == "@<SELF_H> w w w w" and rec["types"] == "text"
+    assert "bananas" not in "".join(ctx.logs)
