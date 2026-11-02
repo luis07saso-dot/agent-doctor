@@ -3,7 +3,7 @@
 Never raises and never returns an empty reply. Outcome labels go to the request log:
 ok | partial | not_found | invalid | api_down | timeout | help | need_target | bad_address |
 off_scope | fallback | fix_guide | fix_guide_none (Q5: no audit in this chat, or no such
-fix number), plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
+fix number), card_profile (Q4 "Open profile" click), plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
 unknown | not_found | invalid | error | pending) and prehire_need_target.
 """
 from __future__ import annotations
@@ -13,7 +13,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Iterable, Optional, Protocol
 
-from agent import guides, router
+from agent import cards, guides, router
 from agent.agentverse import Lookup
 from agent.extract import Target
 from agent.report import PROFILE_URL, TOP_FIXES, clean, fit, format_report
@@ -57,6 +57,7 @@ class Result:
     via_url: bool = False
     cached: bool = False
     live: str = ""  # Q2 live check: "" (not run) | pending | live | degraded | unreachable | ...
+    card: Optional[dict] = None  # Q4: MetadataContent.metadata of an ASI:One card, audits only
 
 
 async def handle(text: str, client: LookupClient, self_handles: Iterable[str] = (),
@@ -112,9 +113,11 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
             live = await _live_check(probe, lk.address, AUDIT_BUDGET_S - (time.monotonic() - started))
         body = format_report(lk, sc, live=live, footer=footer)
         name = clean((lk.profile or {}).get("name")) or clean(target.label)
-        guides.LAST.put(chat_key, guides.Shown(name, lk.address or "", sc.fixes[:TOP_FIXES]))
+        top = sc.fixes[:TOP_FIXES]
+        guides.LAST.put(chat_key, guides.Shown(name, lk.address or "", top))
         live_status = live if isinstance(live, str) else str(getattr(live, "status", "") or "")
-        return Result(body, lk.outcome, target.kind, n, target.from_url, lk.cached, live_status)
+        return Result(body, lk.outcome, target.kind, n, target.from_url, lk.cached, live_status,
+                      _card(name, lk.address or "", sc, top))
     reply = {
         "not_found": router.not_found(target.label),
         "invalid": router.invalid(target.label),
@@ -123,6 +126,53 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
     }.get(lk.outcome, router.FALLBACK)
     outcome = lk.outcome if lk.outcome in ("not_found", "invalid", "api_down", "timeout") else "fallback"
     return err(reply, outcome)
+
+
+def _card(name: str, address: str, sc: Any, top: Iterable[Any]) -> Optional[dict]:
+    """Q4 card for an audit reply. Never breaks the reply: any error -> no card."""
+    try:
+        url = PROFILE_URL.format(address=address) if address else ""
+        payload = cards.audit_payload(name, address, sc.total, sc.verdict,
+                                      [c.fix for c in top], url)
+        return cards.card_metadata(payload)
+    except Exception:
+        return None
+
+
+PROFILE_OPENED = ("Opened the profile on Agentverse: [Open profile on Agentverse]({url})\n\n"
+                  "Changed something? Ask me to re-check it.")
+
+
+async def handle_card(sel: "cards.Selection", client: LookupClient,
+                      self_handles: Iterable[str] = (), self_addresses: Iterable[str] = (),
+                      prehire: Optional[PreHireFn] = None, probe: Optional[ProbeFn] = None,
+                      chat_key: str = "") -> Result:
+    """Q4: a click on an audit card. Never raises, never returns an empty reply."""
+    try:
+        if sel.action == cards.FIX:
+            shown = guides.LAST.get(chat_key)
+            if sel.address and (shown is None or shown.address != sel.address):
+                # This chat forgot that audit (restart, other chat): rebuild it quietly.
+                lk = await asyncio.wait_for(client.lookup(sel.address), HARD_TIMEOUT_S)
+                if lk.outcome not in ("ok", "partial") or (
+                        lk.outcome == "partial" and lk.profile_status in ("timeout", "api_down")):
+                    return Result(router.NO_AUDIT_YET, "fix_guide_none", "address")
+                sc = score(lk)
+                name = clean((lk.profile or {}).get("name")) or "this agent"
+                guides.LAST.put(chat_key, guides.Shown(name, lk.address or sel.address,
+                                                       sc.fixes[:TOP_FIXES]))
+            return _fix_guide(sel.n, chat_key)
+        if sel.action == cards.PROFILE:
+            return Result(PROFILE_OPENED.format(url=PROFILE_URL.format(address=sel.address)),
+                          "card_profile", "address", 1)
+        command = (f"audit {sel.address}" if sel.action == cards.RECHECK
+                   else f"is {sel.address} live?")
+        return await _handle(command, client, self_handles, self_addresses, prehire, probe,
+                             chat_key)
+    except asyncio.TimeoutError:
+        return Result(router.TIMEOUT, "timeout", "address", 1)
+    except Exception:
+        return Result(router.FALLBACK, "fallback", "none")
 
 
 def _fix_guide(n: int, chat_key: str) -> Result:

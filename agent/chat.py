@@ -18,12 +18,13 @@ from uagents import Context, Protocol
 from uagents_core.contrib.protocols.chat import (  # noqa: I001
     ChatAcknowledgement,
     ChatMessage,
+    MetadataContent,
     ResourceContent,
     TextContent,
     chat_protocol_spec,
 )
 
-from agent import prehire, profile, router, service
+from agent import cards, prehire, profile, router, service
 from agent.probe import PROBER
 from agent.shape import shape
 from agent.agentverse import AgentverseClient
@@ -82,8 +83,13 @@ def log_request(ctx: Context, sender: str, input_type: str, outcome: str, starte
         pass  # logging must never break a reply
 
 
-async def _reply(ctx: Context, sender: str, text: str) -> None:
-    await ctx.send(sender, ChatMessage(content=[TextContent(text=text)]))
+async def _reply(ctx: Context, sender: str, text: str, card: dict | None = None) -> None:
+    """Q4: an ASI:One card rides in the SAME message as the full text (Fetch's news-card
+    example), so clients without cards still get the whole reply."""
+    content: list = [TextContent(text=text)]
+    if card:
+        content.append(MetadataContent(metadata=card))
+    await ctx.send(sender, ChatMessage(content=content))
 
 
 @chat_proto.on_message(ChatMessage)
@@ -134,12 +140,19 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
                         started, **meta)
             return
 
-        res = await service.handle(text, CLIENT, SELF_HANDLES, SELF_ADDRESSES,
-                                   prehire=run_prehire,
-                                   probe=lambda address: PROBER.probe(ctx, address),
-                                   chat_key=hash_id(f"{sender}|{_session(ctx)}"))
-        await _reply(ctx, sender, res.text)
+        common = dict(prehire=run_prehire, probe=lambda address: PROBER.probe(ctx, address),
+                      chat_key=hash_id(f"{sender}|{_session(ctx)}"))
+        sel = cards.parse_selection(text)  # Q4: a click on an audit card?
+        if sel is not None:
+            res = await service.handle_card(sel, CLIENT, SELF_HANDLES, SELF_ADDRESSES, **common)
+        else:
+            res = await service.handle(text, CLIENT, SELF_HANDLES, SELF_ADDRESSES, **common)
+        await _reply(ctx, sender, res.text, res.card)
         extra = {"live": res.live} if res.live else {}
+        if sel is not None:
+            extra["click"] = sel.action
+        if res.card:
+            extra["card"] = True
         log_request(ctx, sender, res.input_type, res.outcome, started, targets=res.targets,
                     via_url=res.via_url, cached=res.cached, **extra, **meta)
     except Exception as e:
