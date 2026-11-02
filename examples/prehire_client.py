@@ -50,7 +50,9 @@ async def pre_hire_check(ctx: Context, agent: str, live_probe: bool = True,
                          timeout: int = 45, doctor: str = AGENT_DOCTOR
                          ) -> Optional[PreHireResult]:
     """Ask Doctor about `agent`. None if Doctor didn't answer in `timeout` seconds.
-    live_probe=False skips the test message: profile data only, answers in ~1s."""
+    live_probe=False skips the test message: profile data only, answers in ~1s.
+    One call at a time per ctx: send_and_receive matches the answer by session, so run
+    parallel checks from separate contexts (e.g. separate handler invocations)."""
     reply, _status = await ctx.send_and_receive(
         doctor, PreHireRequest(address=agent, live_probe=live_probe),
         response_type=PreHireResult, timeout=timeout)
