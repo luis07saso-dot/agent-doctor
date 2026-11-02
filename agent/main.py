@@ -1,7 +1,7 @@
 """Entry point: python -m agent.main"""
 from uagents import Agent
 
-from agent import config
+from agent import chat, config
 from agent.chat import chat_proto
 
 settings = config.load()
@@ -17,6 +17,13 @@ agent = Agent(
     publish_agent_details=True,
 )
 agent.include(chat_proto, publish_manifest=True)
+chat.configure(settings.handle)
+
+
+@agent.on_event("shutdown")
+async def _close_client(ctx) -> None:
+    await chat.CLIENT.aclose()
+
 
 if __name__ == "__main__":
     agent.run()

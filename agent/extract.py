@@ -1,0 +1,115 @@
+"""L2 extractor: find which Agentverse agent(s) a free-text message is about.
+
+Accepted target forms (anywhere in a sentence; ASI:One often rewrites messages):
+- address:  agent1q... (bech32, checksum verified)
+- handle:   @some-handle (lowercased; emails like a@b.com are ignored)
+- URL:      any URL containing an address, e.g.
+            https://agentverse.ai/agents/details/agent1q.../profile
+            or an agentverse.ai / asi1.ai URL with an @handle path segment.
+
+No plain-name search (cut from launch). Pure: no I/O.
+"""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from typing import Iterable, Literal
+
+import bech32
+
+from agent.agentverse import HANDLE_MAX, normalize_handle
+
+_BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+# Full-length address, not glued to more bech32 chars on either side.
+_ADDRESS = re.compile(rf"(?<![0-9a-z])agent1[{_BECH32}]{{59}}(?![0-9a-z])", re.IGNORECASE)
+# Something that starts like an address but is the wrong length / has bad chars.
+_ADDRESS_LIKE = re.compile(r"(?<![0-9a-z])agent1[0-9a-z]{20,}", re.IGNORECASE)
+_URL = re.compile(r"https?://[^\s<>()\[\]`'\"]+", re.IGNORECASE)
+_HANDLE_HOSTS = ("agentverse.ai", "asi1.ai")
+# "@token" not preceded by an email-ish char. The whole token is taken atomically (no
+# backtracking to a shorter prefix), then validated against the Agentverse handle pattern,
+# so "@foo_bar", "@foo-" and "@example.com" are rejected rather than read as "@foo".
+_HANDLE = re.compile(r"(?<![A-Za-z0-9._%+\-/@])@([A-Za-z0-9_-]++)(?!@|\.[A-Za-z0-9])")
+_URL_HANDLE = re.compile(r"/@([A-Za-z0-9_-]++)(?=[/?#]|$)")
+_TRAILING_PUNCT = ".,;:!?)]}>'\"`*_"
+
+
+@dataclass(frozen=True)
+class Target:
+    kind: Literal["address", "handle"]
+    value: str  # address, or handle without "@"
+    from_url: bool = field(default=False, compare=False)  # logged only; not part of identity
+
+    @property
+    def label(self) -> str:
+        return self.value if self.kind == "address" else f"@{self.value}"
+
+
+@dataclass(frozen=True)
+class Extraction:
+    targets: tuple[Target, ...] = field(default_factory=tuple)
+    # Saw something address-like that failed length/checksum (typo, truncated paste).
+    bad_address: bool = False
+
+
+def valid_checksum(address: str) -> bool:
+    hrp, data = bech32.bech32_decode(address)
+    return hrp == "agent" and data is not None
+
+
+def extract(text: str, ignore_handles: Iterable[str] = ()) -> Extraction:
+    """Targets in order of appearance, de-duplicated. `ignore_handles` = our own handles
+    (ASI:One may keep "@agent-doctor" in the forwarded message)."""
+    if not text:
+        return Extraction()
+    ignore = {h.lower().lstrip("@") for h in ignore_handles}
+    found: list[tuple[int, Target]] = []
+    bad = False
+
+    # 1. Addresses anywhere (covers addresses inside URLs too).
+    good_spans: list[tuple[int, int]] = []
+    url_spans = [m.span() for m in _URL.finditer(text)]
+    for m in _ADDRESS.finditer(text):
+        addr = m.group(0).lower()
+        if valid_checksum(addr):
+            in_url = any(s <= m.start() < e for s, e in url_spans)
+            found.append((m.start(), Target("address", addr, in_url)))
+            good_spans.append(m.span())
+        else:
+            bad = True
+    for m in _ADDRESS_LIKE.finditer(text):
+        if not any(s <= m.start() < e for s, e in good_spans):
+            bad = True
+
+    # 2. Handles in agentverse.ai / asi1.ai URL paths. Then blank out every URL so
+    #    "@" segments of unrelated URLs (x.com/@foo) are never read as handles.
+    masked = list(text)
+    for m in _URL.finditer(text):
+        url = m.group(0).rstrip(_TRAILING_PUNCT)
+        host = url.split("/", 3)[2].lower().split(":")[0]
+        if any(host == h or host.endswith("." + h) for h in _HANDLE_HOSTS):
+            for hm in _URL_HANDLE.finditer(url):
+                _add_handle(found, m.start() + hm.start(), hm.group(1), ignore, True)
+        for i in range(m.start(), m.end()):
+            masked[i] = " "
+    masked_text = "".join(masked)
+
+    # 3. Bare @handles in the remaining text.
+    for m in _HANDLE.finditer(masked_text):
+        _add_handle(found, m.start(), m.group(1), ignore)
+
+    found.sort(key=lambda p: p[0])
+    seen: set[Target] = set()
+    targets: list[Target] = []
+    for _, t in found:
+        if t not in seen:
+            seen.add(t)
+            targets.append(t)
+    return Extraction(targets=tuple(targets), bad_address=bad and not targets)
+
+
+def _add_handle(found: list, pos: int, raw: str, ignore: set[str], from_url: bool = False) -> None:
+    h = normalize_handle(raw)
+    if h is None or len(h) > HANDLE_MAX or h in ignore:
+        return
+    found.append((pos, Target("handle", h, from_url)))
