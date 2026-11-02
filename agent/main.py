@@ -7,8 +7,9 @@ from agent.prehire import prehire_proto
 from agent.probe import PROBER
 
 
-def build(settings: config.Settings, **overrides) -> Agent:
-    """The Doctor agent. `overrides` go to Agent(...) (local tests: mailbox=False, ...)."""
+def build(settings: config.Settings, publish_manifests: bool = True, **overrides) -> Agent:
+    """The Doctor agent. `overrides` go to Agent(...) (local tests: mailbox=False, ...).
+    publish_manifests=False keeps offline/local runs from posting manifests to Agentverse."""
     kwargs = dict(
         name=profile.NAME,  # display name only; the address comes from the seed
         seed=settings.seed,
@@ -27,8 +28,8 @@ def build(settings: config.Settings, **overrides) -> Agent:
     )
     kwargs.update(overrides)
     agent = Agent(**kwargs)
-    agent.include(chat_proto, publish_manifest=True)
-    agent.include(prehire_proto, publish_manifest=True)
+    agent.include(chat_proto, publish_manifest=publish_manifests)
+    agent.include(prehire_proto, publish_manifest=publish_manifests)
     chat.configure(settings.handle, agent.address)
     # Fresh session per probe so the target's replies can be told apart from user chats.
     # _build_context is uagents-internal (0.26.1, pinned): it is what on_interval uses.
