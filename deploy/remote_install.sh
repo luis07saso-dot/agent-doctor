@@ -16,6 +16,9 @@ install -m 644 "$REL/docker-compose.yml" docker-compose.yml
 install -m 755 "$REL/deploy/dc.sh" dc.sh
 install -m 755 "$REL/deploy/watchdog.sh" watchdog.sh
 install -m 755 "$REL/deploy/rollback_remote.sh" rollback_remote.sh
+install -m 755 "$REL/deploy/collect_logs.sh" collect_logs.sh
+# R9: copy the old container's REQ/mailbox lines out before `up -d` replaces it.
+./collect_logs.sh </dev/null || echo "log collect failed (continuing)" >&2
 
 CUR="$(sed -n 's/^TAG=//p' .tag 2>/dev/null || true)"
 echo "TAG=$SHA" > .tag.candidate
@@ -49,6 +52,13 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 */10 * * * * root $DIR/watchdog.sh $ADDR >/dev/null 2>&1
 CRON
 chmod 644 /etc/cron.d/agent-doctor
+# R9/R10: copy REQ + mailbox lines out of Docker logs every 5 min (scripts/metrics.py reads them).
+cat > /etc/cron.d/agent-doctor-collect <<CRON
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+*/5 * * * * root $DIR/collect_logs.sh >/dev/null 2>&1
+CRON
+chmod 644 /etc/cron.d/agent-doctor-collect
 cat > /etc/logrotate.d/agent-doctor <<ROT
 /var/log/agent-doctor-watchdog.log {
   weekly
