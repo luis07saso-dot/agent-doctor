@@ -13,6 +13,8 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY agent ./agent
+# Agentverse README (published on /connect). Loaded via agent/profile.py.
+COPY README.md ./README.md
 
 # uagents writes <addr>_data.json to the CWD. Keep it on a volume.
 RUN mkdir /data && chown doctor:doctor /data
