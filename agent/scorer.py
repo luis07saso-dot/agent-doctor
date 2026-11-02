@@ -198,12 +198,17 @@ def _description(desc: Any) -> Check:
     return _mk("description", 1, f"{n} chars", "")
 
 
+UNRESPONSIVE_FLAG = "Agentverse flag"
+
+
 def _responsive(active: bool, unresponsive: Any) -> Check:
     if not active:
         return _mk("responsive", 0, "offline", "Answer every message (offline agents time out)")
     if unresponsive is True:
-        return _mk("responsive", 0, "flagged unresponsive",
-                   "Reply to every message: a timed-out conversation flagged it unresponsive")
+        # Agentverse's own flag, not our test (FB-1). Set when a chat times out,
+        # cleared by the next reply. It still costs ranking while it's set.
+        return _mk("responsive", 0, UNRESPONSIVE_FLAG,
+                   "Clear Agentverse's \"unresponsive\" flag: reply fast to every chat")
     return _mk("responsive", 1, "ok", "")
 
 

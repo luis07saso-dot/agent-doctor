@@ -5,7 +5,7 @@ import re
 import unicodedata
 from typing import Any
 
-from agent.scorer import Score
+from agent.scorer import UNRESPONSIVE_FLAG, Score
 
 MAX_CHARS = 1500
 TOP_FIXES = 3
@@ -64,6 +64,11 @@ def format_report(lookup: Any, sc: Score) -> str:
         elif note.startswith("profile "):
             lines.append("_Profile lookup failed, so most checks show as missing. Try again later._")
 
+    c = sc.check
+    flagged = c("responsive").detail == UNRESPONSIVE_FLAG
+    if flagged:
+        lines.append(_flag_note(profile))
+
     fixes = sc.fixes[:TOP_FIXES]
     if fixes:
         lines += ["", "**Top fixes**"]
@@ -71,7 +76,6 @@ def format_report(lookup: Any, sc: Score) -> str:
     else:
         lines += ["", "No fixes needed. Keep it online and answering."]
 
-    c = sc.check
     lines += [
         "",
         "**Details**",
@@ -81,7 +85,8 @@ def format_report(lookup: Any, sc: Score) -> str:
             f"{_mark(c('handle').ok)} Handle",
             f"{_mark(c('avatar').ok)} Avatar",
             f"{_mark(c('description').ok)} Description",
-            f"{_mark(c('responsive').ok)} Responsive",
+            "⚠️ Agentverse flag: unresponsive" if flagged
+            else f"{_mark(c('responsive').ok)} Responsive",
         ]),
         f"README: {c('readme').detail}, {c('readme_sections').detail} · "
         f"Rating {c('rating').detail} · Interactions {c('interactions').detail}",
@@ -95,6 +100,17 @@ def format_report(lookup: Any, sc: Score) -> str:
         lines.append(f"[Open profile]({PROFILE_URL.format(address=lookup.address)}) · "
                      "Re-check any time after changes.")
     return fit("\n".join(lines))
+
+
+def _flag_note(profile: dict) -> str:
+    """FB-1: the unresponsive flag is Agentverse's data, not our test. Say so, say why it's
+    set and how it clears, and give the success-rate context."""
+    note = ("_Agentverse's own data flags this agent \"unresponsive\". We did not test it. "
+            "Agentverse sets it when a chat with the agent times out; the next reply clears it.")
+    rate = profile.get("recent_success_rate")
+    if isinstance(rate, (int, float)) and not isinstance(rate, bool):
+        note += f" Recent ASI:One success rate: {max(0.0, min(1.0, float(rate))):.0%}."
+    return note + "_"
 
 
 def fit(text: str, footer: str = "") -> str:
