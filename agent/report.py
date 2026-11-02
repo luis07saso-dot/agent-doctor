@@ -10,7 +10,7 @@ from agent.scorer import UNRESPONSIVE_FLAG, Score
 MAX_CHARS = 1500
 TOP_FIXES = 3
 PROFILE_URL = "https://agentverse.ai/agents/details/{address}/profile"
-PROBE_WAIT_S = 12  # agent/probe.py PROBE_TIMEOUT_S, for wording only (report stays I/O-free)
+PROBE_WAIT_S = 14  # agent/probe.py PROBE_TIMEOUT_S, for wording only (report stays I/O-free)
 _UNSAFE = re.compile(r"[\r\n`*_\[\]<>|#~\\]+")
 _LINKISH = re.compile(r"\S*(?:://|www\.)\S*", re.IGNORECASE)
 _DOMAIN = re.compile(r"^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")

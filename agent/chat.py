@@ -103,7 +103,8 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
         return
 
     async def run_prehire(target) -> tuple[str, str]:
-        r = await prehire.run_check(ctx, target, CLIENT, PROBER, True, target.label)
+        r = await prehire.run_check(ctx, target, CLIENT, PROBER, True, target.label,
+                                    deadline=started + service.REPLY_BUDGET_S)
         return prehire.format_text(r, target.label), r.status
 
     try:

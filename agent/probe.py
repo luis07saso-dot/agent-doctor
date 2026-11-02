@@ -51,7 +51,8 @@ from agent import rubric
 ProbeStatus = Literal["live", "degraded", "unreachable", "skipped", "error"]
 
 PROBE_TEXT = "Hi! What can you do?"  # neutral, in-scope for any chat agent (see drafts)
-PROBE_TIMEOUT_S = 12.0  # send -> first reply. Keeps chat replies near the 15s p95 target.
+PROBE_TIMEOUT_S = 14.0  # send -> first reply. User decision 2026-11-02 (was 12s). Chat paths
+#                        stop waiting at service.REPLY_BUDGET_S and report "still checking".
 SEND_TIMEOUT_S = 5  # resolving the endpoint + handing the envelope to it
 CACHE_TTL_S = 600.0  # 10 min per target: also the anti-spam bound for third-party agents
 CACHE_MAX = 512
@@ -135,7 +136,7 @@ class Prober:
     # ---------- public API ----------
 
     async def probe(self, ctx: Any, address: str) -> ProbeResult:
-        """Probe one agent. Never raises. Waits at most ~timeout + SEND_TIMEOUT_S."""
+        """Probe one agent. Never raises. Waits at most ~timeout (send time counts)."""
         address = (address or "").strip().lower()
         now_wall = self._wall()
         if address in self._self:

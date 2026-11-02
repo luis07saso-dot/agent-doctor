@@ -2,6 +2,7 @@
 import asyncio
 import importlib.util
 import json
+import time
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,7 +12,7 @@ from uagents import Model
 from uagents_core.contrib.protocols.chat import ChatMessage, TextContent
 
 from agent import agentverse as av
-from agent import chat, guard, prehire, router, service
+from agent import chat, guard, prehire, report, router, service
 from agent.probe import ProbeResult
 from agent.report import MAX_CHARS
 
@@ -329,7 +330,8 @@ def test_chat_audit_of_unflagged_agent_does_not_probe(monkeypatch, chat_wired):
 @pytest.mark.parametrize("status,word", [("live", "LIVE"), ("degraded", "DEGRADED"),
                                          ("unreachable", "UNREACHABLE"), ("unknown", "UNKNOWN"),
                                          ("not_found", "couldn't find"),
-                                         ("invalid", "isn't a valid"), ("error", "try again")])
+                                         ("invalid", "isn't a valid"), ("error", "try again"),
+                                         ("pending", "CHECKING")])
 def test_format_text_every_status(status, word):
     r = prehire.PreHireResult(query="q", status=status, checked_at=NOW,
                               address=STRONG if status not in ("not_found", "invalid", "error")
@@ -352,3 +354,86 @@ def test_service_prehire_timeout(monkeypatch):
 
     res = asyncio.run(service.handle(f"is {STRONG} live?", FakeClient(), prehire=slow))
     assert res.outcome == "prehire_error" and res.text
+
+
+# ---------- reply deadline (user decision 2026-11-02: probe waits 14s, reply <= 15s) ----------
+
+def test_timing_budget_is_consistent():
+    import inspect
+
+    from agent import probe as probe_mod
+    spec = importlib.util.spec_from_file_location("prehire_client",
+                                                  ROOT / "examples" / "prehire_client.py")
+    prehire_client = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(prehire_client)
+    assert probe_mod.PROBE_TIMEOUT_S == 14.0 and report.PROBE_WAIT_S == 14
+    assert service.REPLY_BUDGET_S == 15.0 and service.AUDIT_BUDGET_S == service.REPLY_BUDGET_S
+    assert probe_mod.PROBE_TIMEOUT_S < service.REPLY_BUDGET_S < service.PREHIRE_HARD_TIMEOUT_S
+    # protocol path: handle resolve (<=12s) + full probe must fit, and the client must wait longer
+    assert prehire.CHECK_TIMEOUT_S >= 12 + probe_mod.PROBE_TIMEOUT_S
+    default = inspect.signature(prehire_client.pre_hire_check).parameters["timeout"].default
+    assert default > prehire.CHECK_TIMEOUT_S
+
+
+class SlowProber(FakeProber):
+    def __init__(self, delay, **kw):
+        super().__init__(**kw)
+        self.delay, self.finished = delay, False
+
+    async def probe(self, ctx, address):
+        self.calls.append(address)
+        await asyncio.sleep(self.delay)
+        self.finished = True
+        return ProbeResult(address, checked_at=NOW, **self.r)
+
+
+def test_deadline_gives_pending_and_probe_keeps_running():
+    async def go():
+        pr = SlowProber(0.2)
+        r = await prehire.run_check(Ctx(), prehire.Target("address", STRONG), FakeClient(), pr,
+                                    True, "q", deadline=time.monotonic() + 0.05)
+        assert r.status == prehire.PENDING and not r.live and r.detail == "still_running"
+        assert r.trust_score is not None and r.ack_ms is None and r.reply_ms is None
+        assert not pr.finished
+        await asyncio.sleep(0.3)
+        assert pr.finished  # shielded: giving up on waiting did not cancel the probe
+    asyncio.run(go())
+
+
+def test_deadline_not_hit_gives_verdict():
+    r = asyncio.run(prehire.run_check(Ctx(), prehire.Target("address", STRONG), FakeClient(),
+                                      SlowProber(0.01), True, "q",
+                                      deadline=time.monotonic() + 5))
+    assert r.status == "live"
+
+
+def test_deadline_already_passed_still_starts_probe():
+    async def go():
+        pr = SlowProber(0.3)
+        r = await prehire.run_check(Ctx(), prehire.Target("address", STRONG), FakeClient(), pr,
+                                    True, "q", deadline=time.monotonic() - 1)
+        assert r.status == prehire.PENDING and pr.calls == [STRONG]
+        await asyncio.sleep(0.4)
+        assert pr.finished
+    asyncio.run(go())
+
+
+def test_chat_prehire_slow_target_replies_pending(monkeypatch, chat_wired):
+    pr = SlowProber(0.5)
+    monkeypatch.setattr(chat, "PROBER", SimpleNamespace(probe=pr.probe,
+                                                        owns=lambda s, sess: False))
+    monkeypatch.setattr(service, "REPLY_BUDGET_S", 0.1)
+    t0 = time.monotonic()
+    (reply,), (req,) = say("is weather-bot live?")
+    assert time.monotonic() - t0 < 0.45
+    assert "CHECKING" in reply and 'Ask "is weather-bot live?" again' in reply
+    assert "@weather-bot live" not in reply  # no "@" in the follow-up (ASI:One routing)
+    assert "cached for 10 minutes" not in reply and len(reply) <= MAX_CHARS
+    assert req["outcome"] == "prehire_pending"
+
+
+def test_protocol_path_has_no_deadline(wired):
+    """Agents calling the protocol wait for the full probe: no pending status there."""
+    import inspect
+    src = inspect.getsource(prehire.on_prehire)
+    assert "deadline" not in src
