@@ -10,6 +10,7 @@ from agent.scorer import UNRESPONSIVE_FLAG, Score
 MAX_CHARS = 1500
 TOP_FIXES = 3
 PROFILE_URL = "https://agentverse.ai/agents/details/{address}/profile"
+PROBE_WAIT_S = 12  # agent/probe.py PROBE_TIMEOUT_S, for wording only (report stays I/O-free)
 _UNSAFE = re.compile(r"[\r\n`*_\[\]<>|#~\\]+")
 _LINKISH = re.compile(r"\S*(?:://|www\.)\S*", re.IGNORECASE)
 _DOMAIN = re.compile(r"^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
@@ -45,7 +46,9 @@ def _pts(x: float) -> str:
     return f"{x:.1f}".rstrip("0").rstrip(".")
 
 
-def format_report(lookup: Any, sc: Score) -> str:
+def format_report(lookup: Any, sc: Score, live: Any = None) -> str:
+    """`live` (Q2): ProbeResult of a live check, "pending" if it didn't finish in time, or
+    None (not run). Only used when Agentverse flags the agent unresponsive."""
     profile = lookup.profile or {}
     name = clean(profile.get("name")) or "Unnamed agent"
     handle = profile.get("handle")
@@ -67,7 +70,9 @@ def format_report(lookup: Any, sc: Score) -> str:
     c = sc.check
     flagged = c("responsive").detail == UNRESPONSIVE_FLAG
     if flagged:
-        lines.append(_flag_note(profile))
+        # No "@" in the follow-up: on ASI:One "@other" routes the message to the other agent.
+        ask = clean(handle, 25) if handle else (lookup.address or "")
+        lines.append(_flag_note(profile, live, ask))
 
     fixes = sc.fixes[:TOP_FIXES]
     if fixes:
@@ -102,11 +107,29 @@ def format_report(lookup: Any, sc: Score) -> str:
     return fit("\n".join(lines))
 
 
-def _flag_note(profile: dict) -> str:
+def _flag_note(profile: dict, live: Any = None, ask: str = "") -> str:
     """FB-1: the unresponsive flag is Agentverse's data, not our test. Say so, say why it's
-    set and how it clears, and give the success-rate context."""
-    note = ("_Agentverse's own data flags this agent \"unresponsive\". We did not test it. "
-            "Agentverse sets it when a chat with the agent times out; the next reply clears it.")
+    set and how it clears, and give the success-rate context. Q2: if we ran a live check,
+    say what it found instead of "We did not test it"."""
+    status = live if isinstance(live, str) else getattr(live, "status", None)
+    head = "_Agentverse's own data flags this agent \"unresponsive\". "
+    why = "Agentverse sets it when a chat with the agent times out; the next reply clears it."
+    if status == "live":
+        reply_ms = getattr(live, "reply_ms", None)
+        took = f" in {reply_ms / 1000:.1f}s" if isinstance(reply_ms, (int, float)) else ""
+        note = (head + f"Our live check just got a reply{took}, so the flag looks out of date. "
+                "It should clear after the agent's next answered chat.")
+    elif status == "degraded":
+        note = (head + f"Our live check: it acknowledged but sent no answer within "
+                f"{PROBE_WAIT_S}s. Slow or missing answers are what set the flag.")
+    elif status == "unreachable":
+        note = (head + f"Our live check got no reply within {PROBE_WAIT_S}s, so the flag "
+                "looks right. Check the agent is running and its mailbox is connected.")
+    elif status == "pending":
+        note = (head + why + " Our live check is still running: ask "
+                f"\"is {ask or 'this agent'} live?\" in a minute.")
+    else:
+        note = head + "We did not test it. " + why
     rate = profile.get("recent_success_rate")
     if isinstance(rate, (int, float)) and not isinstance(rate, bool):
         note += f" Recent ASI:One success rate: {max(0.0, min(1.0, float(rate))):.0%}."
