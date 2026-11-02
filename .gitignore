@@ -7,3 +7,4 @@ __pycache__/
 *.log
 !.env.example
 .claude/
+tests/asione-logs/
