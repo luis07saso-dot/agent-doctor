@@ -2,13 +2,14 @@
 
 Never raises and never returns an empty reply. Outcome labels go to the request log:
 ok | partial | not_found | invalid | api_down | timeout | help | need_target | bad_address |
-off_scope | fallback
+off_scope | fallback, plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
+unknown | not_found | invalid | error) and prehire_need_target.
 """
 from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Iterable, Protocol
+from typing import Awaitable, Callable, Iterable, Optional, Protocol
 
 from agent import router
 from agent.agentverse import Lookup
@@ -17,11 +18,17 @@ from agent.report import fit, format_report
 from agent.scorer import score
 
 HARD_TIMEOUT_S = 13.5  # client caps itself at 12s; this is the belt to its braces
+PREHIRE_HARD_TIMEOUT_S = 27.0  # prehire.run_check caps itself at 25s
 
 
 class LookupClient(Protocol):
     async def lookup(self, address: str) -> Lookup: ...
     async def lookup_handle(self, handle: str) -> Lookup: ...
+
+
+# Pre-Hire Check for one target -> (reply text, status). Injected by the chat handler, which
+# owns the context the live probe needs. None = Pre-Hire wording is answered with an audit.
+PreHireFn = Callable[[Target], Awaitable[tuple[str, str]]]
 
 
 @dataclass(frozen=True)
@@ -35,17 +42,18 @@ class Result:
 
 
 async def handle(text: str, client: LookupClient, self_handles: Iterable[str] = (),
-                 self_addresses: Iterable[str] = ()) -> Result:
+                 self_addresses: Iterable[str] = (), prehire: Optional[PreHireFn] = None) -> Result:
     try:
-        return await _handle(text, client, self_handles, self_addresses)
+        return await _handle(text, client, self_handles, self_addresses, prehire)
     except Exception:  # last line of defence: the caller still gets a reply
         return Result(router.FALLBACK, "fallback", "none")
 
 
 async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
-                  self_addresses: Iterable[str] = ()) -> Result:
+                  self_addresses: Iterable[str] = (), prehire: Optional[PreHireFn] = None
+                  ) -> Result:
     intent = router.classify(text, self_handles, self_addresses)
-    if intent.kind != "audit":
+    if intent.kind not in ("audit", "prehire"):
         return Result(router.reply_for(intent.kind), intent.kind, "none")
 
     target: Target = intent.targets[0]
@@ -54,6 +62,13 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
 
     def err(text: str, outcome: str) -> Result:
         return Result(text + footer, outcome, target.kind, n, target.from_url)
+
+    if intent.kind == "prehire" and prehire is not None:
+        try:
+            body, status = await asyncio.wait_for(prehire(target), PREHIRE_HARD_TIMEOUT_S)
+        except asyncio.TimeoutError:
+            return err(router.TIMEOUT, "prehire_error")
+        return Result(fit(body, footer), f"prehire_{status}", target.kind, n, target.from_url)
 
     try:
         lk = await asyncio.wait_for(_lookup(client, target), HARD_TIMEOUT_S)

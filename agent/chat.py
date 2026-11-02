@@ -3,6 +3,10 @@
 Log line (JSON after "REQ "): hashed sender, input type, outcome, latency, content types and
 message shape (words masked, see agent/shape.py). Never message
 bodies, never raw addresses of senders.
+
+Live-probe traffic (agent/probe.py) is split off FIRST, right after the ack: a message from a
+probed agent in a probe session goes to the prober, never to the guard/router/user path, so
+Doctor never answers a probe reply (no reply loops). Logged as "PROBE {json}", not REQ.
 """
 from __future__ import annotations
 
@@ -19,7 +23,8 @@ from uagents_core.contrib.protocols.chat import (  # noqa: I001
     chat_protocol_spec,
 )
 
-from agent import profile, router, service
+from agent import prehire, profile, router, service
+from agent.probe import PROBER
 from agent.shape import shape
 from agent.agentverse import AgentverseClient
 from agent.guard import Guard
@@ -90,6 +95,17 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
     except Exception as e:  # still try to answer
         ctx.logger.error(f"ack failed: {type(e).__name__}")
 
+    if PROBER.owns(sender, _session(ctx)):  # reply to our live probe: never a user message
+        try:
+            await PROBER.on_chat(ctx, sender, msg)
+        except Exception as e:
+            ctx.logger.error(f"probe reply handler failed: {type(e).__name__}")
+        return
+
+    async def run_prehire(target) -> tuple[str, str]:
+        r = await prehire.run_check(ctx, target, CLIENT, PROBER, True, target.label)
+        return prehire.format_text(r, target.label), r.status
+
     try:
         text = _cut(msg.text().strip()).strip()
         # Structure only (words masked): shows how ASI:One rewrites messages. Never the body.
@@ -117,7 +133,8 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
                         started, **meta)
             return
 
-        res = await service.handle(text, CLIENT, SELF_HANDLES, SELF_ADDRESSES)
+        res = await service.handle(text, CLIENT, SELF_HANDLES, SELF_ADDRESSES,
+                                   prehire=run_prehire)
         await _reply(ctx, sender, res.text)
         log_request(ctx, sender, res.input_type, res.outcome, started, targets=res.targets,
                     via_url=res.via_url, cached=res.cached, **meta)
@@ -132,4 +149,8 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
 
 @chat_proto.on_message(ChatAcknowledgement)
 async def on_ack(ctx: Context, sender: str, msg: ChatAcknowledgement) -> None:
-    pass
+    if PROBER.owns(sender, _session(ctx)):
+        try:
+            await PROBER.on_ack(ctx, sender, msg)
+        except Exception as e:
+            ctx.logger.error(f"probe ack handler failed: {type(e).__name__}")
