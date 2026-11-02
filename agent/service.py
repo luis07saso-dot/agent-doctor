@@ -52,7 +52,7 @@ ProbeFn = Callable[[str], Awaitable[Any]]
 class Result:
     text: str
     outcome: str
-    input_type: str  # address | handle | none
+    input_type: str  # address | handle | none | soft_miss (guessed handle not found)
     targets: int = 0
     via_url: bool = False
     cached: bool = False
@@ -80,7 +80,14 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
     if intent.kind == "fix_guide":
         return _fix_guide(intent.n, chat_key)
     if intent.kind not in ("audit", "prehire"):
-        return Result(router.reply_for(intent.kind), intent.kind, "none")
+        text_, outcome = router.reply(intent)
+        return Result(text_, outcome, "none")
+
+    def soft_miss() -> Result:
+        """A guessed mid-sentence handle Agentverse didn't confirm: answer the message as if
+        there were no handle in it. Never an error reply for a guess."""
+        text_, outcome = router.reply(intent.fallback or router.Intent("help"))
+        return Result(text_, outcome, "soft_miss")
 
     target: Target = intent.targets[0]
     n = len(intent.targets)
@@ -93,13 +100,18 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         try:
             body, status = await asyncio.wait_for(prehire(target), PREHIRE_HARD_TIMEOUT_S)
         except asyncio.TimeoutError:
-            return err(router.TIMEOUT, "prehire_error")
+            return soft_miss() if intent.soft else err(router.TIMEOUT, "prehire_error")
+        if intent.soft and status in ("not_found", "invalid", "error"):
+            return soft_miss()
         return Result(fit(body, footer), f"prehire_{status}", target.kind, n, target.from_url)
 
     try:
         lk = await asyncio.wait_for(_lookup(client, target), HARD_TIMEOUT_S)
     except asyncio.TimeoutError:
-        return err(router.TIMEOUT, "timeout")
+        return soft_miss() if intent.soft else err(router.TIMEOUT, "timeout")
+    if intent.soft and (lk.outcome not in ("ok", "partial")
+                        or lk.profile_status in ("timeout", "api_down")):
+        return soft_miss()
 
     # Profile fetch failed (not "not found"): any score would be a guess. Say so instead.
     if lk.outcome == "partial" and lk.profile_status in ("timeout", "api_down"):

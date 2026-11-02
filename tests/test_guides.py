@@ -223,7 +223,7 @@ def test_bare_number_means_a_fix_only_after_an_audit(text, n):
     ("pre-hire check #1", "prehire_need_target"),
     ("audit my agent #3", "need_target"),
     ("is agent #2 live?", "prehire_need_target"),
-    ("how do I rank #1 on agentverse", "need_target"),
+    ("how do I rank #1 on agentverse", "faq"),
     ("what is the number 1 agent on agentverse", "help"),
 ])
 def test_classify_not_fix_followups(text, kind, has_audit):

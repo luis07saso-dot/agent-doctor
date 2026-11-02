@@ -50,8 +50,24 @@ _LIVE_HANDLE = re.compile(
     r"(?:live|alive|online|up|reachable|responsive|responding|answering|working)\b",
     re.IGNORECASE,
 )
-# Feature names that look like hyphenated handles ("check pre-hire") are never targets.
-_NOT_HANDLES = frozenset({"pre-hire", "pre-hire-check"})
+# Feature names and common hyphenated words that look like handles ("check pre-hire",
+# "check my e-mail") are never targets.
+_NOT_HANDLES = frozenset({
+    "pre-hire", "pre-hire-check", "e-mail", "re-check", "real-time", "step-by-step", "follow-up",
+    "how-to", "built-in", "state-of-the-art", "up-to-date", "well-known", "so-called",
+    "e-commerce", "co-founder", "check-in", "sign-up", "sign-in", "log-in", "opt-in", "opt-out",
+    "x-ray", "open-source", "end-to-end", "one-time", "long-term", "short-term", "high-quality",
+    "user-friendly", "non-profit", "self-hosted", "third-party", "wi-fi", "t-shirt", "ai-powered",
+    "multi-agent", "agent-to-agent", "full-time", "part-time", "add-on", "plug-in", "set-up",
+    "start-up", "to-do", "how-tos", "one-off", "top-notch", "in-depth", "first-time",
+})
+# Soft handle: a hyphenated handle-shaped token ANYWHERE in the text ("my agent ticketlens-agent
+# is ..."). Only a guess: the router uses it when the message is about agents, and the service
+# falls back to the plain reply if Agentverse doesn't know it. Same token rules as _BARE_HANDLE.
+_SOFT_HANDLE = re.compile(
+    r"(?<![A-Za-z0-9_@./\-])([a-z0-9]++(?:-[a-z0-9]++)++)(?![A-Za-z0-9_@-]|\.[A-Za-z0-9])",
+    re.IGNORECASE,
+)
 _URL_HANDLE = re.compile(r"/@([A-Za-z0-9_-]++)(?=[/?#]|$)")
 _TRAILING_PUNCT = ".,;:!?)]}>'\"`*_"
 
@@ -149,3 +165,17 @@ def _add_handle(found: list, pos: int, raw: str, ignore: set[str], from_url: boo
     if h is None or len(h) > HANDLE_MAX or h in ignore:
         return
     found.append((pos, Target("handle", h, from_url)))
+
+
+def soft_handles(text: str, ignore_handles: Iterable[str] = ()) -> tuple[str, ...]:
+    """First hyphenated handle-shaped token anywhere in `text`, as a 0/1-tuple. URLs, our own
+    handles, common hyphenated words and number-only tokens ("2026-11-03", "24-7") never count."""
+    if not text:
+        return ()
+    ignore = {h.lower().lstrip("@") for h in ignore_handles} | _NOT_HANDLES
+    masked = _URL.sub(lambda m: " " * len(m.group(0)), text)
+    for m in _SOFT_HANDLE.finditer(masked):
+        h = normalize_handle(m.group(1))
+        if h and len(h) <= HANDLE_MAX and h not in ignore and re.search(r"[a-z]", h):
+            return (h,)
+    return ()

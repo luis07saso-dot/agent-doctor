@@ -45,7 +45,7 @@ def test_no_medical_framing():
 def test_starter_prompts_each_get_a_useful_reply():
     kinds = [classify(p, ["agent-doctor"]).kind for p in P.STARTER_PROMPTS]
     assert "off_scope" not in kinds
-    assert kinds == ["help", "need_target", "audit", "need_target"]
+    assert kinds == ["help", "need_target", "audit", "faq"]  # 4th: rank FAQ (2026-11-03)
 
 
 def test_our_profile_scores_strong_once_live():
