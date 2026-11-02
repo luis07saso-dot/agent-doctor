@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Iterable, Literal
+from typing import Iterable, Literal, Optional
 
-from agent.extract import Target, extract
+from agent import rubric as R
+from agent.extract import Target, extract, soft_handles
 
 HELP = (
     "**Agent Doctor** audits any Agentverse agent and tells you how to rank higher "
@@ -59,6 +60,98 @@ REPEATED = (
 
 FALLBACK = "Sorry, something went wrong on my side. Please try again in a minute."
 
+# ---------- FAQ: one fixed reply per common question about Agent Doctor or ranking ----------
+_NEXT = ("Send an agent address (`agent1q...`), handle (`audit weather-bot`, no @) or Agentverse "
+         "profile link to get its score and top 3 fixes.")
+# Display name per rubric rule; FAQ "score" lists every rule with its points (tests check it
+# matches agent/rubric.py, so the text can't drift from the real weights).
+RULE_NAMES: dict[str, str] = {
+    "active": "Active status",
+    "chat_protocol": "Chat Protocol",
+    "readme_sections": "README sections",
+    "readme": "README length",
+    "rating": "Rating",
+    "description": "Description",
+    "responsive": "Responsive (no unresponsive flag)",
+    "handle": "Custom @handle",
+    "avatar": "Avatar",
+    "interactions": "10+ interactions",
+    "success_rate": "Success rate",
+    "eval_rate": "Evaluation success rate",
+    "website": "Website verification",
+    "starter_prompts": "Starter prompts",
+}
+
+
+def _score_faq() -> str:
+    rules = ", ".join(f"{RULE_NAMES[r]} {int(w)}" for r, w in R.WEIGHTS.items())
+    bands = ", ".join(f"{v.replace(',', '')} {m}+" for m, v in R.VERDICTS if m) + \
+        f", {R.VERDICTS[-1][1]} below {R.VERDICTS[-2][0]}"
+    return (
+        f"**How the score works:** {len(R.WEIGHTS)} checks, 100 points in total. Points per check: "
+        f"{rules}.\n\n"
+        "Agentverse doesn't publish its ranking weights. These are our estimates, weighted by "
+        "what the Agentverse ranking docs stress most. The same agent data always gives the "
+        f"same score.\n\nVerdicts: {bands}. An agent that isn't running is marked Offline.\n\n"
+        + _NEXT
+    )
+
+
+FAQ: dict[str, str] = {
+    "score": _score_faq(),
+    "checks": (
+        "**What I check** (from the Agentverse ranking and README docs):\n"
+        "- Status: active, Chat Protocol, not flagged unresponsive\n"
+        "- README: length and the 6 recommended sections (Summary, Key features, Usage, "
+        "Use cases, Limitations, Metadata)\n"
+        "- Profile: description, custom @handle, avatar, starter prompts\n"
+        "- Track record: rating, 10+ interactions, success and evaluation rates\n"
+        "- Website verification\n\n"
+        "You get a 0-100 score, a verdict and the top 3 fixes, each with how to do it. "
+        "Pre-Hire Check (`is weather-bot live?`) also sends an agent one test message to see "
+        "if it really answers.\n\n" + _NEXT
+    ),
+    "rank": (
+        "**How to rank higher on Agentverse and ASI:One** (from the Agentverse docs):\n"
+        "- Keep it running: only active agents are ranked; inactive ones are pushed down.\n"
+        "- Support the Chat Protocol: it gives a ranking boost.\n"
+        "- Write a good README (Summary, Key features, Usage, Use cases, Limitations, "
+        "Metadata): it's the main document search reads.\n"
+        "- Set a custom @handle, an avatar and a clear description.\n"
+        "- Earn a good rating: real interactions (10+), successful ASI:One chats and "
+        "Agentverse evaluations.\n"
+        "- Verify a website if you can.\n\n"
+        "For your agent's own top 3 fixes: " + _NEXT[0].lower() + _NEXT[1:]
+    ),
+    "free": (
+        "Yes, Agent Doctor is free.\n\n" + _NEXT + " Then ask `how do I fix #1` for "
+        "step-by-step help, or `is weather-bot live?` for a Pre-Hire Check."
+    ),
+}
+# Question patterns, checked in this order. A question about "my agent" with an address or
+# handle in it is an audit, not an FAQ (targets are checked first).
+_FAQ_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
+    ("score", re.compile(
+        r"\bhow\b.{0,40}\bscor(?:e|es|ed|ing)\b|\bscor(?:e|es|ed|ing)\b.{0,40}\b(?:calculat|comput|"
+        r"mean|work|determin|decid|based|weigh)\w*|\brubric\b|\bweights?\b", re.I | re.S)),
+    ("checks", re.compile(
+        r"\bwhat\b.{0,30}\b(?:do|does|will|can)\b.{0,30}\b(?:check|look|audit|test|review|measure|"
+        r"score|cover|analy[sz])\w*", re.I | re.S)),
+    ("free", re.compile(
+        r"\bfree\b|\b(?:cost|costs|price|pricing|charge|fee|fees)\b.{0,40}\b(?:you|it|this|doctor|"
+        r"agent|audit|check)\b|\b(?:you|it|this|doctor|audit|check)\b.{0,40}\b(?:cost|costs|price|"
+        r"charge|fee)\b|\b(?:have|need|got) to pay\b|\b(?:do|must|should) i pay\b", re.I | re.S)),
+    ("rank", re.compile(
+        r"\b(?:how|why|tips?|ways?|advice|improve|boost|increase|more|higher|better)\b.{0,60}"
+        r"\b(?:rank|ranks|ranking|ranked|picks?|discoverab\w*|visib\w*|found|find|show(?:s|ing)? up|"
+        r"comes? up|appear\w*)\b", re.I | re.S)),
+)
+
+
+def faq_key(text: str) -> str:
+    """Which FAQ a message asks, or "" if none."""
+    return next((k for k, rx in _FAQ_PATTERNS if rx.search(text)), "")
+
 NO_AUDIT_YET = (
     "I don't have an audit in this chat yet, so I don't know which fix you mean. "
     "Send an agent address or handle first (e.g. `audit weather-bot`, no @), "
@@ -101,7 +194,10 @@ _AGENT_WORD = re.compile(r"\b(agents?|agentverse|asi|uagents?|bot|handle|address
 _PREHIRE = re.compile(r"\bpre-?hire\b|\bprobe\b|\bping\b", re.IGNORECASE)
 _LIVE_Q = re.compile(
     r"\b(?:is|are|check (?:if|whether))\b.{0,100}?"
-    r"\b(?:live|alive|online|reachable|responsive|responding|answering|up(?=\s*[?.!]*\s*$))\b",
+    r"\b(?:live|alive|online|reachable|responsive|responding|answering|"
+    # "is it up?" is liveness; "showing up", "come up" (search visibility) are not.
+    r"(?<!show )(?<!shows )(?<!showing )(?<!come )(?<!comes )(?<!coming )(?<!pop )(?<!pops )"
+    r"(?<!popping )(?<!turn )(?<!turns )(?<!turning )(?<!end )up(?=\s*[?.!]*\s*$))\b",
     re.IGNORECASE | re.DOTALL)
 # Q5 follow-ups: the n-th top fix of the last audit in this chat.
 # Strong form (always): the word "fix" right before the number, the number ending the phrase
@@ -145,7 +241,7 @@ _GREETING = re.compile(r"^\W*(hi|hello|hey|help|start|menu|commands?|usage|what 
                        re.IGNORECASE)
 
 Kind = Literal["audit", "prehire", "help", "need_target", "prehire_need_target", "bad_address",
-               "off_scope", "fix_guide"]
+               "off_scope", "fix_guide", "faq"]
 
 
 @dataclass(frozen=True)
@@ -153,6 +249,11 @@ class Intent:
     kind: Kind
     targets: tuple[Target, ...] = ()
     n: int = 0  # fix_guide: which fix (1-based)
+    key: str = ""  # faq: which FAQ
+    # soft = the target is a guess (a handle mid-sentence). If Agentverse doesn't know it, the
+    # service answers with `fallback` (what the message means without the guess) instead.
+    soft: bool = False
+    fallback: Optional["Intent"] = None
 
 
 def classify(text: str, self_handles: Iterable[str] = (),
@@ -175,9 +276,23 @@ def classify(text: str, self_handles: Iterable[str] = (),
     n = fix_number(text, has_audit)
     if n:
         return Intent("fix_guide", n=n)
+    base = _no_target(text)
+    soft = soft_handles(text, self_handles)
+    # A guessed handle only when the message is about agents (not off-scope), or is the handle alone.
+    if soft and (base.kind != "off_scope" or text.strip(" \t\n.,!?:;'\"`*") .lower() == soft[0]):
+        return Intent("prehire" if wants_prehire else "audit", (Target("handle", soft[0]),),
+                      soft=True, fallback=base)
+    return base
+
+
+def _no_target(text: str) -> Intent:
+    """Intent of a message with no address or handle in it."""
     if _PREHIRE.search(text) and _AGENT_WORD.search(text) or (
             _LIVE_Q.search(text) and _AGENT_WORD.search(text)):
         return Intent("prehire_need_target")  # "pre-hire check", "is my agent live?"
+    key = faq_key(text)
+    if key:
+        return Intent("faq", key=key)  # "how is the score calculated?", "how do I rank higher?"
     if _REQUEST.search(text) and _AGENT_WORD.search(text):
         return Intent("need_target")  # "audit my agent": about agents but no target yet
     if _AGENT_WORD.search(text) or _GREETING.search(text):
@@ -186,7 +301,7 @@ def classify(text: str, self_handles: Iterable[str] = (),
 
 
 def reply_for(kind: Kind) -> str:
-    """Fixed reply for every non-audit intent."""
+    """Fixed reply for every non-audit, non-FAQ intent."""
     return {
         "help": HELP,
         "need_target": NEED_TARGET,
@@ -194,3 +309,10 @@ def reply_for(kind: Kind) -> str:
         "bad_address": BAD_ADDRESS,
         "off_scope": OFF_SCOPE,
     }[kind]
+
+
+def reply(intent: Intent) -> tuple[str, str]:
+    """(reply text, log outcome) for an intent with no lookup to do."""
+    if intent.kind == "faq":
+        return FAQ[intent.key], f"faq_{intent.key}"
+    return reply_for(intent.kind), intent.kind

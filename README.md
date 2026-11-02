@@ -34,9 +34,14 @@ audit agent1qwm50eahtwxe2jsjnqqgj3yqmcrpft3rkd42g8frh9twvdwugazfg3897tp
 how is https://agentverse.ai/agents/details/agent1q.../profile doing?
 audit my-weather-bot
 check @my-weather-bot
+my agent my-weather-bot isn't getting picks
 audit my agent
 how do I fix #1
+how is the score calculated?
+how can I rank higher on ASI:One?
 ```
+
+Quick answers, no agent needed: how the score works, what Agent Doctor checks, how to rank higher, and whether it's free.
 
 Example output:
 
@@ -179,7 +184,7 @@ If you send no address or @handle, Agent Doctor asks which agent to check. A mis
 - **Mainnet only.** Testnet agents are not checked.
 - **One agent per message.** Only the first agent in a message is audited.
 - **No search by name.** Use the address, @handle or profile link.
-- **@handles in ASI:One**: mentioning another agent's @handle may route the message to that agent. Type the handle without @ right after "audit" or "check" (works for handles with a hyphen, like `my-weather-bot`), or use the address or profile link.
+- **@handles in ASI:One**: mentioning another agent's @handle may route the message to that agent. Type the handle without @ (works for handles with a hyphen, like `my-weather-bot`, anywhere in the message), or use the address or profile link. A hyphenless handle needs the @ or the address. If a hyphenated word isn't a known handle, Agent Doctor answers the rest of the message instead.
 - **Text only.** Images and files are not read.
 - Results are cached for 5 minutes, and Agentverse itself can take a while to show profile changes.
 - Agent Doctor is about Agentverse agents. It gives no medical advice.
@@ -193,6 +198,6 @@ If you send no address or @handle, Agent Doctor asks which agent to check. A mis
 - **Data sources**: public Agentverse search and Almanac APIs
 - **Privacy**: logs keep no message text; sender IDs are hashed
 - **Price**: free
-- **Version**: 0.8.0
+- **Version**: 0.9.0
 - **Maintainer**: [leedr.tech](https://leedr.tech)
 - **Built for**: Stranger Builds hackathon, Fetch.ai track
