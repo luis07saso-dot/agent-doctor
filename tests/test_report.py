@@ -17,7 +17,7 @@ def load(name) -> av.Lookup:
     return av.Lookup(**d)
 
 
-@pytest.mark.parametrize("name", ["strong", "weak", "dead"])
+@pytest.mark.parametrize("name", ["strong", "weak", "dead", "flagged"])
 def test_fixtures_render_under_limit(name):
     lk = load(name)
     sc = score(lk)
@@ -97,3 +97,34 @@ def test_untrusted_domain_not_printed_raw():
 
     assert safe_domain("weather.fetch.ai") == "weather.fetch.ai"
     assert safe_domain("[x](https://evil)") == "set"
+
+
+def test_unresponsive_flag_attributed_to_agentverse():
+    """FB-1: a working agent flagged by Agentverse must not read as our verdict."""
+    lk = load("flagged")
+    assert lk.profile["unresponsive"] is True and lk.profile["status"] == "active"
+    out = format_report(lk, score(lk))
+    assert "Agentverse's own data flags this agent" in out
+    assert "We did not test it" in out
+    assert "the next reply clears it" in out
+    assert "Recent ASI:One success rate: 0%" in out
+    assert "Agentverse flag: unresponsive" in out
+    assert "❌ Responsive" not in out
+    assert "not responsive" not in out.lower()
+    assert out.index("We did not test it") < out.index("**Top fixes**")
+    assert lk.address in out and len(out) <= MAX_CHARS
+
+
+def test_no_flag_note_when_not_flagged():
+    for name in ("strong", "weak", "dead"):
+        lk = load(name)
+        out = format_report(lk, score(lk))
+        assert "We did not test it" not in out
+        assert "Agentverse flag" not in out
+
+
+def test_flag_note_without_success_rate():
+    lk = load("flagged")
+    lk.profile["recent_success_rate"] = None
+    out = format_report(lk, score(lk))
+    assert "We did not test it" in out and "success rate" not in out

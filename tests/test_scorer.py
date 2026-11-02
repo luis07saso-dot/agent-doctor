@@ -175,6 +175,14 @@ def test_rule_responsive():
     assert not with_("status", "inactive").check("responsive").ok
 
 
+def test_unresponsive_flag_is_attributed_not_our_verdict():
+    from agent.scorer import UNRESPONSIVE_FLAG
+    c = with_("unresponsive", True).check("responsive")
+    assert c.detail == UNRESPONSIVE_FLAG and c.points == 0
+    assert "Agentverse" in c.fix and "flag" in c.fix
+    assert with_("status", "inactive").check("responsive").detail == "offline"
+
+
 def test_rule_handle():
     assert with_(None, None).check("handle").ok
     assert not with_("handle", None).check("handle").ok
