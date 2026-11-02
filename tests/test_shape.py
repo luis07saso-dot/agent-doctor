@@ -7,7 +7,7 @@ HANDLES = ("agent-doctor",)
 
 
 def s(text):
-    return shape(text, SELF, HANDLES)
+    return shape(text, [SELF], HANDLES)
 
 
 def test_words_are_masked():

@@ -115,3 +115,30 @@ def test_bad_address_ignored_when_good_target_present():
 def test_target_label():
     assert Target("handle", "abc").label == "@abc"
     assert Target("address", STRONG).label == STRONG
+
+
+# ASI:One prepends "@<agent address>" to the FIRST message of a new chat (seen live in the
+# REQ log shape "@<SELF> w w w w?", 2026-11-02). That is a mention of us, not a target.
+SELF = "agent1qwm50eahtwxe2jsjnqqgj3yqmcrpft3rkd42g8frh9twvdwugazfg3897tp"
+ME = {"ignore_handles": ["agent-doctor"], "ignore_addresses": [SELF]}
+
+
+def test_own_address_mention_is_not_a_target():
+    ex = extract(f"@{SELF} What can you do?", **ME)
+    assert ex.targets == () and not ex.bad_address
+    assert extract(f"@{SELF} @agent-doctor What can you do?", **ME).targets == ()
+
+
+def test_first_message_audit_targets_the_real_agent():
+    assert addrs(f"@{SELF} audit {STRONG}", **ME) == [STRONG]
+    assert handles(f"@{SELF} @agent-doctor check @agent-listing-generator", **ME) == [
+        "agent-listing-generator"]
+
+
+def test_bare_own_address_is_still_a_self_audit():
+    assert addrs(f"@{SELF} Audit {SELF}", **ME) == [SELF]
+    assert addrs(f"is {SELF} set up well?", **ME) == [SELF]
+
+
+def test_other_address_mention_is_still_a_target():
+    assert addrs(f"audit @{STRONG}", **ME) == [STRONG]

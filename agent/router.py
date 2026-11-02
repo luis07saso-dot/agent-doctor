@@ -84,15 +84,19 @@ class Intent:
     targets: tuple[Target, ...] = ()
 
 
-def classify(text: str, self_handles: Iterable[str] = ()) -> Intent:
+def classify(text: str, self_handles: Iterable[str] = (),
+             self_addresses: Iterable[str] = ()) -> Intent:
     text = (text or "").strip()
-    ex = extract(text, ignore_handles=self_handles)
+    self_addresses = tuple(a for a in self_addresses if a)
+    ex = extract(text, ignore_handles=self_handles, ignore_addresses=self_addresses)
     if ex.targets:
         return Intent("audit", ex.targets)
     if ex.bad_address:
         return Intent("bad_address")
     for h in self_handles:  # "@agent-doctor hi" from ASI:One: judge the rest of the text
         text = re.sub(rf"@{re.escape(h.lstrip('@'))}(?![A-Za-z0-9_-])", " ", text, flags=re.I).strip()
+    for a in self_addresses:  # "@<own address> ..." = ASI:One's first message of a new chat
+        text = re.sub(rf"@{re.escape(a)}(?![0-9a-z])", " ", text, flags=re.I).strip()
     if not text:
         return Intent("help")
     if _REQUEST.search(text) and _AGENT_WORD.search(text):

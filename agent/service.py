@@ -34,15 +34,17 @@ class Result:
     cached: bool = False
 
 
-async def handle(text: str, client: LookupClient, self_handles: Iterable[str] = ()) -> Result:
+async def handle(text: str, client: LookupClient, self_handles: Iterable[str] = (),
+                 self_addresses: Iterable[str] = ()) -> Result:
     try:
-        return await _handle(text, client, self_handles)
+        return await _handle(text, client, self_handles, self_addresses)
     except Exception:  # last line of defence: the caller still gets a reply
         return Result(router.FALLBACK, "fallback", "none")
 
 
-async def _handle(text: str, client: LookupClient, self_handles: Iterable[str]) -> Result:
-    intent = router.classify(text, self_handles)
+async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
+                  self_addresses: Iterable[str] = ()) -> Result:
+    intent = router.classify(text, self_handles, self_addresses)
     if intent.kind != "audit":
         return Result(router.reply_for(intent.kind), intent.kind, "none")
 
