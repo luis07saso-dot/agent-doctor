@@ -208,9 +208,12 @@ def _responsive(active: bool, unresponsive: Any) -> Check:
 
 
 def _handle(handle: Any) -> Check:
-    if isinstance(handle, str) and 0 < len(handle) <= R.HANDLE_MAX_CHARS:
+    # Any handle counts: 20 chars is the limit for setting one now, not a ranking rule.
+    # Older, longer handles still resolve and are still the agent's custom handle.
+    if isinstance(handle, str) and handle:
         return _mk("handle", 1, f"@{handle}", "")
-    return _mk("handle", 0, "none", "Set a custom @handle (max 20 chars) close to the agent's job")
+    return _mk("handle", 0, "none",
+               f"Set a custom @handle (max {R.HANDLE_MAX_CHARS} chars) close to the agent's job")
 
 
 def _avatar(href: Any) -> Check:
