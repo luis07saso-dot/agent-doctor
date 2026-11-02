@@ -96,18 +96,12 @@ def test_service_faq_reply_and_outcome():
 # ---------- handles mid-sentence (soft targets) ----------
 
 @pytest.mark.parametrize("text,kind", [
-    ("my agent ticketlens-agent is not getting picks", "audit"),
     ("ticketlens-agent isn't ranking", "audit"),
     ("why is ticketlens-agent not showing up?", "audit"),
     ("can you look at ticketlens-agent", "audit"),
     ("help with ticketlens-agent", "audit"),
     ("what's wrong with ticketlens-agent?", "audit"),
     ("my agent is ticketlens-agent", "audit"),
-    ("my handle is ticketlens-agent", "audit"),
-    ("ticketlens-agent", "audit"),
-    ("Ticketlens-Agent.", "audit"),
-    ("here's my agent: ticketlens-agent", "audit"),
-    ("my agent called ticketlens-agent has a low score", "audit"),
     ("how can ticketlens-agent rank higher?", "audit"),
     ("ticketlens-agent score?", "audit"),
     ("why is ticketlens-agent not responding?", "prehire"),
@@ -116,6 +110,35 @@ def test_soft_handle_mid_sentence(text, kind):
     it = router.classify(text, ME)
     assert it.kind == kind and it.soft
     assert [t.value for t in it.targets] == ["ticketlens-agent"]
+
+
+# Leftover 1: a handle right after "agent"/"bot"/"handle (is)"/"called"/"named", or sent alone,
+# is clearly meant as a handle: a miss says "couldn't find", like "audit x" does.
+@pytest.mark.parametrize("text", [
+    "my agent ticketlens-agent is not getting picks",
+    "my handle is ticketlens-agent",
+    "my handle: ticketlens-agent",
+    "ticketlens-agent",
+    "Ticketlens-Agent.",
+    "here's my agent: ticketlens-agent",
+    "my agent called ticketlens-agent has a low score",
+    "the bot named ticketlens-agent",
+])
+def test_anchored_handle_is_a_firm_target(text):
+    it = router.classify(text, ME)
+    assert it.kind == "audit" and not it.soft
+    assert [t.value for t in it.targets] == ["ticketlens-agent"]
+
+
+def test_anchor_word_inside_a_handle_does_not_anchor_the_next_token():
+    it = router.classify("ticketlens-agent weather-bot", ME)  # "-agent" is part of a handle
+    assert it.soft and [t.value for t in it.targets] == ["ticketlens-agent"]
+
+
+def test_anchored_typo_says_not_found():
+    c = FakeClient("not_found")
+    res = asyncio.run(service.handle("my agent ticketlens-agnet is not getting picks", c, ME))
+    assert res.outcome == "not_found" and "@ticketlens-agnet" in res.text
 
 
 def test_hard_targets_are_not_soft():
@@ -153,7 +176,7 @@ def test_check_my_email_is_not_a_handle():
 @pytest.mark.parametrize("outcome", ["not_found", "invalid", "timeout", "api_down", "weird"])
 def test_soft_miss_falls_back_to_the_plain_reply(outcome):
     c = FakeClient(outcome)
-    res = asyncio.run(service.handle("my agent ticketlens-agent is not getting picks", c, ME))
+    res = asyncio.run(service.handle("can you look at ticketlens-agent", c, ME))
     assert c.calls == ["@ticketlens-agent"]
     assert res.text == router.HELP and res.outcome == "help" and res.input_type == "soft_miss"
 
@@ -166,7 +189,7 @@ def test_soft_miss_on_faq_question_gives_the_faq():
 
 def test_soft_hit_audits():
     c = FakeClient("ok")
-    res = asyncio.run(service.handle("my agent ticketlens-agent is not getting picks", c, ME))
+    res = asyncio.run(service.handle("can you look at ticketlens-agent", c, ME))
     assert c.calls == ["@ticketlens-agent"] and res.outcome == "ok" and "Score " in res.text
     assert res.input_type == "handle"
 
@@ -200,3 +223,23 @@ def test_showing_up_is_not_prehire(text):
 
 def test_is_it_up_is_still_prehire():
     assert router.classify("is my agent up?", ME).kind == "prehire_need_target"
+
+
+# Leftover 2: "working" is liveness wording, with or without a handle.
+@pytest.mark.parametrize("text,kind", [
+    ("is my agent working?", "prehire_need_target"),
+    ("is ticketlens-agent working?", "prehire"),
+    ("is ticketlens-agent still working?", "prehire"),
+    ("are my agents working right now?", "prehire_need_target"),
+])
+def test_working_is_liveness(text, kind):
+    assert router.classify(text, ME).kind == kind
+
+
+# Leftover 3: docs say inactive agents are de-prioritized, not hidden or excluded.
+def test_offline_wording_matches_docs():
+    from agent import scorer
+    assert "hidden" not in R.DOWN_VERDICT.lower() and "excluded" not in R.DOWN_VERDICT.lower()
+    assert "de-prioritized" in R.DOWN_VERDICT
+    import inspect
+    assert "excluded from ranking" not in inspect.getsource(scorer)

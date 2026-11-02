@@ -4,7 +4,8 @@ Sources (verified 2026-11-02): docs.agentverse.ai v2 -> agent-optimization/ranki
 agent-discovery/readme-guidelines, agent-discovery/profile, agent-discovery/verifications,
 agent-optimization/growth-metrics. Agentverse does NOT publish weights; these are our
 estimates, ordered by the docs' emphasis:
-- Inactive agents are excluded from ranking  -> biggest single weight.
+- Only active agents are considered in ranking; inactive ones are de-prioritized unless
+  searched for directly  -> biggest single weight. (Re-checked 2026-11-03.)
 - Chat Protocol = boost, none = penalty; README = "primary" indexing document.
 - Handle, avatar ("slight" boost), description, >=10 interactions = listed factors.
 - Rating = recent + total interactions, successful ASI:One conversations, evaluations.
@@ -73,4 +74,4 @@ VERDICTS: tuple[tuple[int, str], ...] = (  # (min score, label), first match win
     (40, "Needs work"),
     (0, "Weak"),
 )
-DOWN_VERDICT = "Offline: hidden from ranking"
+DOWN_VERDICT = "Offline: de-prioritized in ranking"

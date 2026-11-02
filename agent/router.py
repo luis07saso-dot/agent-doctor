@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Iterable, Literal, Optional
 
 from agent import rubric as R
-from agent.extract import Target, extract, soft_handles
+from agent.extract import Target, extract, handle_anchored, soft_handles
 
 HELP = (
     "**Agent Doctor** audits any Agentverse agent and tells you how to rank higher "
@@ -194,7 +194,7 @@ _AGENT_WORD = re.compile(r"\b(agents?|agentverse|asi|uagents?|bot|handle|address
 _PREHIRE = re.compile(r"\bpre-?hire\b|\bprobe\b|\bping\b", re.IGNORECASE)
 _LIVE_Q = re.compile(
     r"\b(?:is|are|check (?:if|whether))\b.{0,100}?"
-    r"\b(?:live|alive|online|reachable|responsive|responding|answering|"
+    r"\b(?:live|alive|online|reachable|responsive|responding|answering|working|"
     # "is it up?" is liveness; "showing up", "come up" (search visibility) are not.
     r"(?<!show )(?<!shows )(?<!showing )(?<!come )(?<!comes )(?<!coming )(?<!pop )(?<!pops )"
     r"(?<!popping )(?<!turn )(?<!turns )(?<!turning )(?<!end )up(?=\s*[?.!]*\s*$))\b",
@@ -278,10 +278,13 @@ def classify(text: str, self_handles: Iterable[str] = (),
         return Intent("fix_guide", n=n)
     base = _no_target(text)
     soft = soft_handles(text, self_handles)
-    # A guessed handle only when the message is about agents (not off-scope), or is the handle alone.
-    if soft and (base.kind != "off_scope" or text.strip(" \t\n.,!?:;'\"`*") .lower() == soft[0]):
-        return Intent("prehire" if wants_prehire else "audit", (Target("handle", soft[0]),),
-                      soft=True, fallback=base)
+    if soft:
+        kind = "prehire" if wants_prehire else "audit"
+        target = (Target("handle", soft[0]),)
+        if handle_anchored(text, soft[0]):  # "my agent X", "handle is X", X alone: a firm target
+            return Intent(kind, target)
+        if base.kind != "off_scope":  # elsewhere: a guess, only in a message about agents
+            return Intent(kind, target, soft=True, fallback=base)
     return base
 
 
