@@ -2,6 +2,7 @@
 import asyncio
 import importlib.util
 import json
+import re
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -103,6 +104,22 @@ def test_client_snippet_models_match_agent_exactly():
         assert (Model.build_schema_digest(getattr(mod, name))
                 == Model.build_schema_digest(getattr(prehire, name)))
     assert mod.AGENT_DOCTOR == chat.profile.SELF_ADDRESS
+
+
+def test_readme_snippet_models_match_agent_exactly():
+    """The README carries the client inline (repo is private). It must run as pasted and
+    produce the same schema digests as the agent, or callers' requests never match."""
+    readme = (ROOT / "README.md").read_text()
+    blocks = re.findall(r"```python\n(.*?)```", readme, re.S)
+    code = next(b for b in blocks if "class PreHireResult(Model)" in b)
+    ns: dict = {}
+    exec(compile(code, "README-snippet", "exec"), ns)  # defines models + function only
+    for name in ("PreHireRequest", "PreHireResult"):
+        assert (Model.build_schema_digest(ns[name])
+                == Model.build_schema_digest(getattr(prehire, name)))
+    assert ns["AGENT_DOCTOR"] == chat.profile.SELF_ADDRESS
+    assert asyncio.iscoroutinefunction(ns["pre_hire_check"])
+    assert "github.com" not in readme  # repo stays private: no dead links
 
 
 @pytest.mark.filterwarnings("ignore:coroutine .Agent.publish_manifest. was never awaited")
