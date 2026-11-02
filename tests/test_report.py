@@ -41,6 +41,26 @@ def test_handle_shown_when_present():
     assert "(@blank-agent-621)" in format_report(lk, score(lk))
 
 
+@pytest.mark.parametrize("name", ["Agent Doctor", "agent doctor", "Agent Doctor Pro"])
+def test_header_does_not_repeat_agent_doctor(name):
+    # Self-audit read "Agent Doctor: Agent Doctor". Drop the prefix if the name has it.
+    lk = load("weak")
+    lk2 = av.Lookup(query=lk.query, outcome="ok", address=lk.address,
+                    profile=dict(lk.profile, name=name), almanac=lk.almanac,
+                    almanac_status="ok")
+    first = format_report(lk2, score(lk2)).splitlines()[0]
+    assert first == f"**{name}** (@blank-agent-621)"
+
+
+def test_header_keeps_prefix_for_other_agents():
+    lk = load("weak")
+    lk2 = av.Lookup(query=lk.query, outcome="ok", address=lk.address,
+                    profile=dict(lk.profile, name="Weather Bot"), almanac=lk.almanac,
+                    almanac_status="ok")
+    first = format_report(lk2, score(lk2)).splitlines()[0]
+    assert first == "**Agent Doctor: Weather Bot** (@blank-agent-621)"
+
+
 def test_hostile_profile_text_is_cleaned_and_bounded():
     lk = load("weak")
     prof = dict(lk.profile, name="**pwn**\n# [x](http://evil) `code` " + "A" * 500,
