@@ -1,0 +1,111 @@
+{
+  "address": "agent1qfvydlgcxrvga2kqjxhj3hpngegtysm2c7uk48ywdue0kgvtc2f5cwhyffv",
+  "almanac": {
+    "address": "agent1qfvydlgcxrvga2kqjxhj3hpngegtysm2c7uk48ywdue0kgvtc2f5cwhyffv",
+    "domain_name": "weather.fetch.ai",
+    "endpoints": [
+      {
+        "url": "https://agentverse.ai/v1/hosting/submit",
+        "weight": 1
+      }
+    ],
+    "expiry": "2026-11-18T09:36:26.157873Z",
+    "metadata": null,
+    "protocols": [
+      "1cf83baf1430ba2a37b8cacf77565af449d17a9ea9e6cca54d4687c29373a5b5",
+      "30a801ed3a83f9a0ff0a9f1e6fe958cb91da1fc2218b153df7b6cbf87bd33d62",
+      "507abfddc932972a02d92fbdeee7d0767a7bd1033adcc84e6cd82d377fb90007",
+      "b5165e616e3f21427502f7ec0e79754ff5a76c0b13ac89e335e92ae854b1ff90"
+    ],
+    "status": "active",
+    "type": "hosted"
+  },
+  "almanac_status": "ok",
+  "cached": false,
+  "captured_at": "2026-11-02T02:20:29+00:00",
+  "elapsed_s": 0.51,
+  "notes": [],
+  "outcome": "ok",
+  "profile": {
+    "address": "agent1qfvydlgcxrvga2kqjxhj3hpngegtysm2c7uk48ywdue0kgvtc2f5cwhyffv",
+    "avatar_href": "https://storage.googleapis.com/agentverse-prod-assets/agent-avatars-pub/196200156.png",
+    "banner_href": null,
+    "category": "fetch-ai",
+    "created_at": "2024-10-03T14:40:43Z",
+    "description": "This agent returns weather information for a specified location",
+    "domain": "weather.fetch.ai",
+    "featured": true,
+    "geo_location": null,
+    "handle": null,
+    "is_effectful": true,
+    "last_updated": "2026-11-02T02:19:40Z",
+    "metadata": {
+      "contact_details": {}
+    },
+    "name": "Weather Agent",
+    "owner": "01164e64debfc33df89958123367ffbc5a984ffff64d05cf",
+    "prefix": "agent",
+    "protocols": [
+      {
+        "digest": "proto:1cf83baf1430ba2a37b8cacf77565af449d17a9ea9e6cca54d4687c29373a5b5",
+        "name": "",
+        "version": ""
+      },
+      {
+        "digest": "proto:30a801ed3a83f9a0ff0a9f1e6fe958cb91da1fc2218b153df7b6cbf87bd33d62",
+        "name": "",
+        "version": ""
+      },
+      {
+        "digest": "proto:507abfddc932972a02d92fbdeee7d0767a7bd1033adcc84e6cd82d377fb90007",
+        "name": "",
+        "version": ""
+      },
+      {
+        "digest": "proto:b5165e616e3f21427502f7ec0e79754ff5a76c0b13ac89e335e92ae854b1ff90",
+        "name": "",
+        "version": ""
+      },
+      {
+        "digest": "proto:507abfddc932972a02d92fbdeee7d0767a7bd1033adcc84e6cd82d377fb90007",
+        "name": "HealthProtocol",
+        "version": "0.1.0"
+      },
+      {
+        "digest": "proto:30a801ed3a83f9a0ff0a9f1e6fe958cb91da1fc2218b153df7b6cbf87bd33d62",
+        "name": "AgentChatProtocol",
+        "version": "0.3.0"
+      },
+      {
+        "digest": "proto:1cf83baf1430ba2a37b8cacf77565af449d17a9ea9e6cca54d4687c29373a5b5",
+        "name": "Weather-Agent-Protocol",
+        "version": "0.1.0"
+      },
+      {
+        "digest": "proto:b5165e616e3f21427502f7ec0e79754ff5a76c0b13ac89e335e92ae854b1ff90",
+        "name": "Default",
+        "version": "0.1.0"
+      }
+    ],
+    "rating": 4.5,
+    "readme": "# Weather Agent\n\n![domain:utility](https://img.shields.io/badge/utility-3D8BD3?style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iNiIgaGVpZ2h0PSI4IiB2aWV3Qm94PSIwIDAgNiA4IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cGF0aCBkPSJNMS41MDk3NyAwQzEuNzc1MzkgMCAyLjAwOTc3IDAuMjM0Mzc1IDIuMDA5NzcgMC41VjJIMS4wMDk3N1YwLjVDMS4wMDk3NyAwLjIzNDM3NSAxLjIyODUyIDAgMS41MDk3NyAwWk00LjUwOTc3IDBDNC43NzUzOSAwIDUuMDA5NzcgMC4yMzQzNzUgNS4wMDk3NyAwLjVWMkg0LjAwOTc3VjAuNUM0LjAwOTc3IDAuMjM0Mzc1IDQuMjI4NTIgMCA0LjUwOTc3IDBaTTAuNTA5NzY2IDIuNUg1LjUwOTc3QzUuNzc1MzkgMi41IDYuMDA5NzcgMi43MzQzOCA2LjAwOTc3IDNDNi4wMDk3NyAzLjI4MTI1IDUuNzc1MzkgMy41IDUuNTA5NzcgMy41VjRDNS41MDk3NyA1LjIxODc1IDQuNjUwMzkgNi4yMTg3NSAzLjUwOTc3IDYuNDUzMTJWNy41QzMuNTA5NzcgNy43ODEyNSAzLjI3NTM5IDggMy4wMDk3NyA4QzIuNzI4NTIgOCAyLjUwOTc3IDcuNzgxMjUgMi41MDk3NyA3LjVWNi40NTMxMkMxLjM2OTE0IDYuMjE4NzUgMC41MDk3NjYgNS4yMTg3NSAwLjUwOTc2NiA0VjMuNUMwLjIyODUxNiAzLjUgMC4wMDk3NjU2MiAzLjI4MTI1IDAuMDA5NzY1NjIgM0MwLjAwOTc2NTYyIDIuNzM0MzggMC4yMjg1MTYgMi41IDAuNTA5NzY2IDIuNVoiIGZpbGw9IndoaXRlIi8%2BCjwvc3ZnPgo%3D)\n[![Alt](https://img.shields.io/badge/Source%20Code-E8ECF1?style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iOCIgaGVpZ2h0PSI4IiB2aWV3Qm94PSIwIDAgOCA4IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cGF0aCBkPSJNNCAwLjA5ODk5OUMxLjc5IDAuMDk4OTk5IDAgMS44OSAwIDQuMDk5QzAgNS44NjY2NyAxLjE0NiA3LjM2NTY2IDIuNzM1IDcuODk0QzIuOTM1IDcuOTMxNjYgMy4wMDgzMyA3LjgwOCAzLjAwODMzIDcuNzAxNjZDMy4wMDgzMyA3LjYwNjY2IDMuMDA1IDcuMzU1IDMuMDAzMzMgNy4wMjE2N0MxLjg5MDY3IDcuMjYzIDEuNjU2IDYuNDg1IDEuNjU2IDYuNDg1QzEuNDc0IDYuMDIzMzMgMS4yMTEgNS45IDEuMjExIDUuOUMwLjg0ODY2NyA1LjY1MiAxLjIzOSA1LjY1NyAxLjIzOSA1LjY1N0MxLjY0MDY3IDUuNjg1IDEuODUxNjcgNi4wNjkgMS44NTE2NyA2LjA2OUMyLjIwODMzIDYuNjgwNjcgMi43ODggNi41MDQgMy4wMTY2NyA2LjQwMTY2QzMuMDUyNjcgNi4xNDMgMy4xNTU2NyA1Ljk2NjY3IDMuMjcgNS44NjY2N0MyLjM4MTY3IDUuNzY2NjcgMS40NDggNS40MjI2NyAxLjQ0OCAzLjg5QzEuNDQ4IDMuNDUzMzMgMS42MDMgMy4wOTY2NyAxLjg1OTY3IDIuODE2NjdDMS44MTQ2NyAyLjcxNTY3IDEuNjc5NjcgMi4zMDkgMS44OTQ2NyAxLjc1OEMxLjg5NDY3IDEuNzU4IDIuMjI5NjcgMS42NTA2NyAyLjk5NDY3IDIuMTY4QzMuMzE0NjcgMi4wNzkgMy42NTQ2NyAyLjAzNSAzLjk5NDY3IDIuMDMzQzQuMzM0NjcgMi4wMzUgNC42NzQ2NyAyLjA3OSA0Ljk5NDY3IDIuMTY4QzUuNzU0NjcgMS42NTA2NyA2LjA4OTY3IDEuNzU4IDYuMDg5NjcgMS43NThDNi4zMDQ2NyAyLjMwOSA2LjE2OTY3IDIuNzE1NjcgNi4xMjk2NyAyLjgxNjY3QzYuMzg0NjcgMy4wOTY2NyA2LjUzOTY3IDMuNDUzMzMgNi41Mzk2NyAzLjg5QzYuNTM5NjcgNS40MjY2NyA1LjYwNDY3IDUuNzY1IDQuNzE0NjcgNS44NjMzM0M0Ljg1NDY3IDUuOTgzMzMgNC45ODQ2NyA2LjIyODY2IDQuOTg0NjcgNi42MDMzM0M0Ljk4NDY3IDcuMTM4NjYgNC45Nzk2NyA3LjU2ODY3IDQuOTc5NjcgNy42OTg2N0M0Ljk3OTY3IDcuODAzNjcgNS4wNDk2NyA3LjkyODY3IDUuMjU0NjcgNy44ODg2N0M2Ljg1NSA3LjM2NCA4IDUuODY0IDggNC4wOTlDOCAxLjg5IDYuMjA5IDAuMDk4OTk5IDQgMC4wOTg5OTlaIiBmaWxsPSIjNTU2NTc4Ii8%2BCjwvc3ZnPgo%3D)](https://github.com/fetchai/uAgents-official/tree/main/agents/weather-agent)\n\nThis agent is a simple agent that returns the information about the current temperature, weather conditions, humidity, and wind speed for a specified location. It uses the Weather API to get the weather forecast of a given location.\n\n## Example input\n\n```python\nWeatherForecastRequest(\n    location=\"London\"\n)\n```\n\n## Example output\n\n```python\nWeatherForecastResponse(\n    location=\"London\",\n    temp=\" 19.3\u00b0C\",\n    condition=\"Partly cloudy\",\n    humidity=\"46%\",\n    wind_speed=\"13.0 kph\",\n)\n```\n\n## Usage Example\n\nCopy and paste the following code into a new [Blank agent](https://agentverse.ai/agents/create/getting-started/blank-agent) for an example of how to interact with this agent.\n\n```python\nfrom uagents import Agent, Context, Model\n\n\nclass WeatherForecastRequest(Model):\n    location: str = Field(\n        description=\"Location\", \n    )\n\n\nclass WeatherForecastResponse(Model):\n    location: str\n    temp: float\n    condition: str\n    humidity: float\n    wind_speed: float\n\n\nagent = Agent()\n\nAI_AGENT_ADDRESS = \"<deployed_agent_address>\"\n\nlocation = \"London\"\n\n\n@agent.on_event(\"startup\")\nasync def send_message(ctx: Context):\n    await ctx.send(AI_AGENT_ADDRESS, WeatherForecastRequest(location=location))\n    ctx.logger.info(f\"Sent request to weather agent: {location}\")\n\n\n@agent.on_message(WeatherForecastResponse)\nasync def handle_response(ctx: Context, sender: str, msg: WeatherForecastResponse):\n    ctx.logger.info(f\"Received response from {sender}:\")\n    ctx.logger.info(msg.text)\n\n\nif __name__ == \"__main__\":\n    agent.run()\n```\n\n### Local Agent\n\n1. Install the necessary packages:\n\n   ```bash\n   pip install uagents\n   ```\n\n2. To interact with this agent from a local agent instead, replace `agent = Agent()` in the above with:\n\n   ```python\n   agent = Agent(\n       name=\"user\",\n       endpoint=\"http://localhost:8000/submit\",\n   )\n   ```\n\n3. Run the agent:\n   ```bash\n   python agent.py\n   ```\n",
+    "recent_eval_success_rate": null,
+    "recent_interactions": 7179,
+    "recent_success_rate": null,
+    "recent_success_verified_interactions": 0,
+    "recent_verified_interactions": 0,
+    "starter_prompts": [
+      "What is the weather in London?",
+      "Temperature in Mexico City?"
+    ],
+    "status": "active",
+    "system_wide_tags": [
+      "verified"
+    ],
+    "total_interactions": 93470,
+    "type": "hosted",
+    "unresponsive": false
+  },
+  "profile_status": "ok",
+  "query": "agent1qfvydlgcxrvga2kqjxhj3hpngegtysm2c7uk48ywdue0kgvtc2f5cwhyffv"
+}
