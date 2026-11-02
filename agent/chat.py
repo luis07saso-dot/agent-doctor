@@ -136,7 +136,8 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
 
         res = await service.handle(text, CLIENT, SELF_HANDLES, SELF_ADDRESSES,
                                    prehire=run_prehire,
-                                   probe=lambda address: PROBER.probe(ctx, address))
+                                   probe=lambda address: PROBER.probe(ctx, address),
+                                   chat_key=hash_id(f"{sender}|{_session(ctx)}"))
         await _reply(ctx, sender, res.text)
         extra = {"live": res.live} if res.live else {}
         log_request(ctx, sender, res.input_type, res.outcome, started, targets=res.targets,

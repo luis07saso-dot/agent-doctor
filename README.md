@@ -12,7 +12,8 @@ It is built for agent builders asking "why is nobody finding my agent?". Think o
 
 - **One-message agent audit**: paste an `agent1q...` address, an `@handle` or a profile link, in any sentence.
 - **0-100 agent profile score** with a verdict: Strong, Good with gaps, Needs work, Weak, or Offline.
-- **Top 3 fixes ranked by impact**, each with the points it would add.
+- **Top 3 fixes ranked by impact**, each with the points it would add and how to do it, with an example.
+- **Step-by-step fix guides**: after an audit, ask `how do I fix #1` (or #2, #3) for the exact steps, where to click on Agentverse and a copy-paste example.
 - **Agent README review**: checks the README exists, is long enough to be indexed, and has the six recommended sections (Summary, Key features, Usage, Use cases, Limitations, Metadata).
 - **Agentverse ranking checks**: active status, Chat Protocol, @handle, avatar, description, starter prompts, rating, interactions, ASI:One success rate, Testing results and website verification.
 - **ASI:One search visibility**: flags offline or unresponsive agents. Inactive agents are left out of ranking.
@@ -34,6 +35,7 @@ how is https://agentverse.ai/agents/details/agent1q.../profile doing?
 audit my-weather-bot
 check @my-weather-bot
 audit my agent
+how do I fix #1
 ```
 
 Example output:
@@ -45,15 +47,36 @@ Score 45/100 · Needs work
 Top fixes
 1. Write a Markdown README with sections: Summary, Key features, Usage,
    Use cases, Limitations, Metadata (+23 pts)
+   How: Profile tab → Edit README, start with `## Summary`: what it does and for whom.
 2. Raise rating: pass Agentverse Testing runs and get real ASI:One users (+8.4 pts)
+   How: Testing tab → Questions → Generate, run them, fix failures; bring real users.
 3. Add a one-line Agent Description (+6 pts)
+   How: Profile tab → Agent Description, e.g. "Summarises news articles into
+   5 bullets for busy readers."
 
 Details
 ✅ Active · ✅ Chat Protocol · ✅ Handle · ❌ Avatar · ❌ Description · ✅ Responsive
 README: missing, 0/6 sections · Rating 0.8/5 · Interactions 14
 ASI:One success: none yet · Testing: none yet · Website: none · Starter prompts: 0
 
-Open profile · Re-check any time after changes.
+Ask "how do I fix #1" for step-by-step help. Re-check any time after changes.
+
+Open profile on Agentverse
+```
+
+Then `how do I fix #3` gives the full guide for that fix:
+
+```text
+Fix #3 for Weather Bot: Add a one-line Agent Description (+6 pts)
+
+The description shows on your profile, your Marketplace listing and in search.
+
+Steps
+1. Profile tab → Agent Description and Prompts.
+2. One or two sentences: what it does and who it helps. Specific, no keyword lists.
+
+Example
+"Summarises long news articles into 5 bullet points for busy readers."
 ```
 
 ### Pre-Hire Check: is this agent really answering?
@@ -150,6 +173,7 @@ If you send no address or @handle, Agent Doctor asks which agent to check. A mis
 
 - **Scores the profile, not the agent's skills.** The audit only sends the agent a test message when Agentverse flags it "unresponsive" (to confirm or overturn the flag). Pre-Hire Check sends one on request. Either way: one short test message, at most once per agent every 10 minutes.
 - **Pre-Hire Check tests availability, not answer quality.** LIVE means the agent answered within 14 seconds; it does not judge the answer. An agent that acknowledges but answers after 14s shows as DEGRADED; one that does not even acknowledge shows as UNREACHABLE.
+- **Fix guides follow the last audit in the same chat.** `how do I fix #2` needs an audit earlier in that chat; it is kept in memory for 6 hours and lost if Agent Doctor restarts (just audit again). Guides follow the Agentverse docs; the Agentverse UI may change.
 - **Weights are our estimate.** Agentverse does not publish its ranking weights. The rubric follows the official docs' emphasis; the same input always gives the same score.
 - **Keywords are not checked yet.** Make sure each keyword appears in your README.
 - **Mainnet only.** Testnet agents are not checked.
@@ -169,6 +193,6 @@ If you send no address or @handle, Agent Doctor asks which agent to check. A mis
 - **Data sources**: public Agentverse search and Almanac APIs
 - **Privacy**: logs keep no message text; sender IDs are hashed
 - **Price**: free
-- **Version**: 0.7.0
+- **Version**: 0.8.0
 - **Maintainer**: [leedr.tech](https://leedr.tech)
 - **Built for**: Stranger Builds hackathon, Fetch.ai track

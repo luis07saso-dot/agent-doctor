@@ -2,7 +2,8 @@
 
 Never raises and never returns an empty reply. Outcome labels go to the request log:
 ok | partial | not_found | invalid | api_down | timeout | help | need_target | bad_address |
-off_scope | fallback, plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
+off_scope | fallback | fix_guide | fix_guide_none (Q5: no audit in this chat, or no such
+fix number), plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
 unknown | not_found | invalid | error | pending) and prehire_need_target.
 """
 from __future__ import annotations
@@ -12,10 +13,10 @@ import time
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Iterable, Optional, Protocol
 
-from agent import router
+from agent import guides, router
 from agent.agentverse import Lookup
 from agent.extract import Target
-from agent.report import fit, format_report
+from agent.report import PROFILE_URL, TOP_FIXES, clean, fit, format_report
 from agent.scorer import UNRESPONSIVE_FLAG, score
 
 HARD_TIMEOUT_S = 13.5  # client caps itself at 12s; this is the belt to its braces
@@ -60,18 +61,23 @@ class Result:
 
 async def handle(text: str, client: LookupClient, self_handles: Iterable[str] = (),
                  self_addresses: Iterable[str] = (), prehire: Optional[PreHireFn] = None,
-                 probe: Optional[ProbeFn] = None) -> Result:
+                 probe: Optional[ProbeFn] = None, chat_key: str = "") -> Result:
+    """`chat_key` identifies one chat (hashed sender + session). An audit remembers its top
+    fixes under it, so a later "how do I fix #2" in the same chat gets that fix's guide."""
     try:
-        return await _handle(text, client, self_handles, self_addresses, prehire, probe)
+        return await _handle(text, client, self_handles, self_addresses, prehire, probe, chat_key)
     except Exception:  # last line of defence: the caller still gets a reply
         return Result(router.FALLBACK, "fallback", "none")
 
 
 async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
                   self_addresses: Iterable[str] = (), prehire: Optional[PreHireFn] = None,
-                  probe: Optional[ProbeFn] = None) -> Result:
+                  probe: Optional[ProbeFn] = None, chat_key: str = "") -> Result:
     started = time.monotonic()
-    intent = router.classify(text, self_handles, self_addresses)
+    has_audit = guides.LAST.get(chat_key) is not None
+    intent = router.classify(text, self_handles, self_addresses, has_audit)
+    if intent.kind == "fix_guide":
+        return _fix_guide(intent.n, chat_key)
     if intent.kind not in ("audit", "prehire"):
         return Result(router.reply_for(intent.kind), intent.kind, "none")
 
@@ -104,7 +110,9 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         live = None
         if probe is not None and lk.address and sc.check("responsive").detail == UNRESPONSIVE_FLAG:
             live = await _live_check(probe, lk.address, AUDIT_BUDGET_S - (time.monotonic() - started))
-        body = fit(format_report(lk, sc, live=live), footer)
+        body = format_report(lk, sc, live=live, footer=footer)
+        name = clean((lk.profile or {}).get("name")) or clean(target.label)
+        guides.LAST.put(chat_key, guides.Shown(name, lk.address or "", sc.fixes[:TOP_FIXES]))
         live_status = live if isinstance(live, str) else str(getattr(live, "status", "") or "")
         return Result(body, lk.outcome, target.kind, n, target.from_url, lk.cached, live_status)
     reply = {
@@ -115,6 +123,20 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
     }.get(lk.outcome, router.FALLBACK)
     outcome = lk.outcome if lk.outcome in ("not_found", "invalid", "api_down", "timeout") else "fallback"
     return err(reply, outcome)
+
+
+def _fix_guide(n: int, chat_key: str) -> Result:
+    """Q5: full guide for fix #n of this chat's last audit. No lookup, no I/O."""
+    shown = guides.LAST.get(chat_key)
+    if shown is None:
+        return Result(router.NO_AUDIT_YET, "fix_guide_none", "none")
+    if not 1 <= n <= len(shown.fixes):
+        return Result(router.no_such_fix(n, len(shown.fixes), shown.name), "fix_guide_none", "none")
+    tail = ""
+    if shown.address:
+        tail = f"\n\n[Open profile on Agentverse]({PROFILE_URL.format(address=shown.address)})"
+    body = guides.full_guide(n, shown.fixes[n - 1], shown.name)
+    return Result(fit(body, tail), "fix_guide", "none")
 
 
 async def _lookup(client: LookupClient, target: Target) -> Lookup:

@@ -5,6 +5,7 @@ import re
 import unicodedata
 from typing import Any
 
+from agent.guides import short_how
 from agent.scorer import UNRESPONSIVE_FLAG, Score
 
 MAX_CHARS = 1500
@@ -46,9 +47,14 @@ def _pts(x: float) -> str:
     return f"{x:.1f}".rstrip("0").rstrip(".")
 
 
-def format_report(lookup: Any, sc: Score, live: Any = None) -> str:
+def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "") -> str:
     """`live` (Q2): ProbeResult of a live check, "pending" if it didn't finish in time, or
-    None (not run). Only used when Agentverse flags the agent unresponsive."""
+    None (not run). Only used when Agentverse flags the agent unresponsive.
+    `footer` (e.g. the multi-target note) goes last; the result incl. footer is <= MAX_CHARS.
+
+    Q5: each top fix gets a one-line how-to; dropped from the last fix up if the report
+    would be too long. Q3 (FB-1.2): the profile link is its own paragraph at the end and is
+    never trimmed (ASI:One merges single-newline lines into one paragraph)."""
     profile = lookup.profile or {}
     name = clean(profile.get("name")) or "Unnamed agent"
     handle = profile.get("handle")
@@ -74,14 +80,14 @@ def format_report(lookup: Any, sc: Score, live: Any = None) -> str:
         ask = clean(handle, 25) if handle else (lookup.address or "")
         lines.append(_flag_note(profile, live, ask))
 
+    head = lines
     fixes = sc.fixes[:TOP_FIXES]
-    if fixes:
-        lines += ["", "**Top fixes**"]
-        lines += [f"{i}. {c.fix} (+{_pts(c.lost)} pts)" for i, c in enumerate(fixes, 1)]
-    else:
-        lines += ["", "No fixes needed. Keep it online and answering."]
+    hows: list[str] = []
+    for f in fixes:  # offline agents: "active" and "responsive" share a how-to; show it once
+        how = short_how(f)
+        hows.append("" if how in hows else how)
 
-    lines += [
+    details = [
         "",
         "**Details**",
         " · ".join([
@@ -98,13 +104,35 @@ def format_report(lookup: Any, sc: Score, live: Any = None) -> str:
         f"ASI:One success: {c('success_rate').detail} · Testing: {c('eval_rate').detail} · "
         f"Website: {safe_domain(c('website').detail) if c('website').ok else 'none'} · Starter prompts: {c('starter_prompts').detail}",
         "",
-        "_Keywords are private, so not scored: make sure each appears in your README. "
-        "Weights are our estimate; Agentverse doesn't publish them._",
+        "_Keywords are private, so not scored: put each one in your README. "
+        "Weights are our estimate (Agentverse doesn't publish them)._",
     ]
+    tail = ["", ("Ask \"how do I fix #1\" for step-by-step help. " if fixes else "")
+            + "Re-check any time after changes."]
     if lookup.address:
-        lines.append(f"[Open profile]({PROFILE_URL.format(address=lookup.address)}) · "
-                     "Re-check any time after changes.")
-    return fit("\n".join(lines))
+        tail += ["", f"[Open profile on Agentverse]({PROFILE_URL.format(address=lookup.address)})"]
+    tail_text = "\n" + "\n".join(tail) + footer
+
+    def build(n_how: int) -> str:
+        body = list(head)
+        if fixes:
+            body += ["", "**Top fixes**"]
+            for i, f in enumerate(fixes, 1):
+                how = hows[i - 1] if i <= n_how else ""
+                # Two trailing spaces = Markdown hard break: ASI:One would otherwise join the
+                # how-to onto the fix line. Renderers without hard breaks still show one line.
+                body.append(f"{i}. {f.fix} (+{_pts(f.lost)} pts)" + ("  " if how else ""))
+                if how:
+                    body.append(f"   {how}")
+        else:
+            body += ["", "No fixes needed. Keep it online and answering."]
+        return "\n".join(body + details)
+
+    for n_how in range(len(fixes), -1, -1):
+        text = build(n_how) + tail_text
+        if len(text) <= MAX_CHARS:
+            return text
+    return fit(build(0), tail_text)
 
 
 def _flag_note(profile: dict, live: Any = None, ask: str = "") -> str:
