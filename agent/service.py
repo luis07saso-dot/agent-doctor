@@ -3,7 +3,7 @@
 Never raises and never returns an empty reply. Outcome labels go to the request log:
 ok | partial | not_found | invalid | api_down | timeout | help | need_target | bad_address |
 off_scope | fallback, plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
-unknown | not_found | invalid | error) and prehire_need_target.
+unknown | not_found | invalid | error | pending) and prehire_need_target.
 """
 from __future__ import annotations
 
@@ -19,10 +19,17 @@ from agent.report import fit, format_report
 from agent.scorer import UNRESPONSIVE_FLAG, score
 
 HARD_TIMEOUT_S = 13.5  # client caps itself at 12s; this is the belt to its braces
-PREHIRE_HARD_TIMEOUT_S = 27.0  # prehire.run_check caps itself at 25s
+# Every chat reply that waits on a live probe goes out by this many seconds after the request
+# arrived (our p95 target is <15s; a slow reply risks our own "unresponsive" flag). The probe
+# waits up to 14s (user decision 2026-11-02). Not done by then -> "still checking" reply; the
+# probe keeps running and is cached, so asking again gives the verdict at once.
+REPLY_BUDGET_S = 15.0
+# Pre-Hire chat path: the check stops waiting at REPLY_BUDGET_S itself (deadline set in
+# chat.py). This is only the belt, for a slow Agentverse lookup.
+PREHIRE_HARD_TIMEOUT_S = REPLY_BUDGET_S + 2.0
 # Q2: audit + live check of a flagged agent must still answer in one reply (user decision
 # Q2-D2 = a). Counted from the start of the request; the probe gets what's left.
-AUDIT_BUDGET_S = 13.0
+AUDIT_BUDGET_S = REPLY_BUDGET_S
 MIN_PROBE_S = 1.0  # less than this left: don't wait, report the check as still running
 LIVE_PENDING = "pending"  # format_report: probe started but not finished within the budget
 

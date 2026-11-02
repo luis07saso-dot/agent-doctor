@@ -54,8 +54,8 @@ def test_wording_constant_matches_probe_timeout():
 
 @pytest.mark.parametrize("status,phrase", [
     ("live", "Our live check just got a reply in 2.4s, so the flag looks out of date"),
-    ("degraded", "acknowledged but sent no answer within 12s"),
-    ("unreachable", "no reply within 12s, so the flag looks right"),
+    ("degraded", "acknowledged but sent no answer within 14s"),
+    ("unreachable", "no reply within 14s, so the flag looks right"),
 ])
 def test_flagged_agent_gets_live_verdict(status, phrase):
     probe, calls = prober(status)

@@ -1,6 +1,6 @@
 # Agent Doctor
 
-Free agent audit for Agentverse agents. Send an agent address, @handle or Agentverse profile link and get a 0-100 agent profile score, a verdict and the top 3 fixes to improve agent ranking on Agentverse and ASI:One.
+Free agent audit for Agentverse agents. Send an agent address, @handle or Agentverse profile link and get a 0-100 agent profile score, a verdict and the top 3 fixes to improve agent ranking on Agentverse and ASI:One. Built for Agentverse optimization and ASI:One search visibility.
 
 ## Summary
 
@@ -17,7 +17,8 @@ It is built for agent builders asking "why is nobody finding my agent?". Think o
 - **Agentverse ranking checks**: active status, Chat Protocol, @handle, avatar, description, starter prompts, rating, interactions, ASI:One success rate, Testing results and website verification.
 - **ASI:One search visibility**: flags offline or unresponsive agents. Inactive agents are left out of ranking.
 - **Same input, same output**: rule-based scoring, no LLM guesswork. Results cached for 5 minutes.
-- **Free**. Usually replies in about a second.
+- **Free**. Usually replies in about a second. Replies that include a live test take up to 15 seconds.
+- **Pre-Hire Check (live test)**: ask `is my-weather-bot live?` and Agent Doctor sends that agent one test message, times its acknowledgement and answer, and adds its rating and profile score. Other agents can call it too (see "For agents").
 
 ## Usage
 
@@ -55,6 +56,43 @@ ASI:One success: none yet · Testing: none yet · Website: none · Starter promp
 Open profile · Re-check any time after changes.
 ```
 
+### Pre-Hire Check: is this agent really answering?
+
+Before you rely on an agent, check that it answers right now. Agent Doctor sends it one short test message ("Hi! What can you do?"), waits up to 14 seconds, and reports what happened.
+
+```text
+is my-weather-bot live?
+pre-hire check agent1q...
+```
+
+Example output:
+
+```text
+Pre-Hire Check: @my-weather-bot
+LIVE: it answered a test message just now.
+Live test: ack 1.4s · answer 4.9s
+Profile: ✅ Active · ✅ Chat Protocol · Rating 3.2/5 · Doctor score 71/100
+Agentverse flags it "unresponsive", but it answered our test just now, so the flag
+looks out of date. It clears after its next answered conversation.
+
+Checked 10:42 UTC with one test message. Results are cached for 10 minutes.
+Full profile audit: audit agent1q...
+```
+
+Verdicts: **LIVE** (it answered), **DEGRADED** (it acknowledged but sent no answer in time), **UNREACHABLE** (no acknowledgement, no answer). If the agent has not answered by the time Agent Doctor must reply, you get **CHECKING**: ask again a minute later for the verdict.
+
+### For agents: Pre-Hire Check protocol
+
+Orchestrators and routers can ask Agent Doctor before they hire (call) another agent. Protocol `AgentDoctorPreHire` 0.1.0: send `PreHireRequest{address}`, get back `PreHireResult{status, live, ack_ms, reply_ms, chat_protocol, active, unresponsive_flag, rating, trust_score, checked_at, cached, detail, profile_url}`.
+
+```python
+result = await pre_hire_check(ctx, "agent1q...")   # copy-paste client: see below
+if result and result.live:
+    ...  # hire it
+```
+
+Copy-paste client (two models + one function): https://github.com/luis07saso-dot/hallo/blob/main/examples/prehire_client.py. Paste the two models exactly as they are (they define the schema digest). Allow up to about 45 seconds. Use `live_probe=False` for a profile-only answer in about a second.
+
 If you send no address or @handle, Agent Doctor asks which agent to check. A mistyped address gets a "copy it again" reply, not a wrong report.
 
 ## Use cases
@@ -67,7 +105,8 @@ If you send no address or @handle, Agent Doctor asks which agent to check. A mis
 
 ## Limitations
 
-- **Scores the profile, not the agent's skills.** It does not chat with the audited agent or test its answers.
+- **Scores the profile, not the agent's skills.** The audit only sends the agent a test message when Agentverse flags it "unresponsive" (to confirm or overturn the flag). Pre-Hire Check sends one on request. Either way: one short test message, at most once per agent every 10 minutes.
+- **Pre-Hire Check tests availability, not answer quality.** LIVE means the agent answered within 14 seconds; it does not judge the answer. An agent that acknowledges but answers after 14s shows as DEGRADED; one that does not even acknowledge shows as UNREACHABLE.
 - **Weights are our estimate.** Agentverse does not publish its ranking weights. The rubric follows the official docs' emphasis; the same input always gives the same score.
 - **Keywords are not checked yet.** Make sure each keyword appears in your README.
 - **Mainnet only.** Testnet agents are not checked.
@@ -83,10 +122,10 @@ If you send no address or @handle, Agent Doctor asks which agent to check. A mis
 - **Name**: Agent Doctor
 - **Handle**: @agent-doctor
 - **Address**: `agent1qwm50eahtwxe2jsjnqqgj3yqmcrpft3rkd42g8frh9twvdwugazfg3897tp`
-- **Protocol**: Agent Chat Protocol 0.3.0
+- **Protocols**: Agent Chat Protocol 0.3.0, AgentDoctorPreHire 0.1.0
 - **Data sources**: public Agentverse search and Almanac APIs
 - **Privacy**: logs keep no message text; sender IDs are hashed
 - **Price**: free
-- **Version**: 0.6.0
+- **Version**: 0.7.0
 - **Maintainer**: [leedr.tech](https://leedr.tech)
 - **Built for**: Stranger Builds hackathon, Fetch.ai track

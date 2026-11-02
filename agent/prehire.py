@@ -37,7 +37,10 @@ PROTOCOL_VERSION = "0.1.0"
 # Pinned by tests: changing the models must be a deliberate, versioned change.
 PROTOCOL_DIGEST = "proto:4d48d9b2f6b74dc064cbaf0d516fbc9cdb1ea0127151d92e1205471a200477d4"
 
-CHECK_TIMEOUT_S = 25.0  # handle resolve (<=12s, usually <1s) + probe (12s) + slack
+CHECK_TIMEOUT_S = 28.0  # handle resolve (<=12s, usually <1s) + probe (14s) + slack
+# Chat path only: the probe did not finish before the reply deadline. It keeps running and is
+# cached for 10 min, so asking again answers at once. Protocol callers never get this status.
+PENDING = "pending"
 PER_SENDER_PER_MIN = 20  # protocol callers; cached answers are cheap, probes are bounded
 
 
@@ -49,7 +52,7 @@ class PreHireRequest(Model):
 class PreHireResult(Model):
     query: str
     address: str = ""
-    status: str  # live | degraded | unreachable | unknown | not_found | invalid | rate_limited | error
+    status: str  # live | degraded | unreachable | unknown | not_found | invalid | rate_limited | error | pending (chat only)
     live: bool = False
     detail: str = ""
     chat_protocol: Optional[bool] = None
@@ -89,12 +92,16 @@ def parse_query(text: str, self_handles=()) -> Target | None:
 
 
 async def run_check(ctx: Any, target: Target, client: Any, prober: Prober = PROBER,
-                    live_probe: bool = True, query: str = "") -> PreHireResult:
-    """Never raises. Bounded by CHECK_TIMEOUT_S."""
+                    live_probe: bool = True, query: str = "",
+                    deadline: float | None = None) -> PreHireResult:
+    """Never raises. Bounded by CHECK_TIMEOUT_S.
+    `deadline` (time.monotonic(), chat path only): stop waiting for the live probe then and
+    return status PENDING. The probe itself keeps running and its result is cached."""
     query = (query or target.label)[:200]
     try:
         return await asyncio.wait_for(
-            _run_check(ctx, target, client, prober, live_probe, query), CHECK_TIMEOUT_S)
+            _run_check(ctx, target, client, prober, live_probe, query, deadline),
+            CHECK_TIMEOUT_S)
     except asyncio.TimeoutError:
         return PreHireResult(query=query, status="error", detail="timeout",
                              checked_at=_iso(time.time()))
@@ -104,7 +111,7 @@ async def run_check(ctx: Any, target: Target, client: Any, prober: Prober = PROB
 
 
 async def _run_check(ctx, target: Target, client, prober: Prober, live_probe: bool,
-                     query: str) -> PreHireResult:
+                     query: str, deadline: float | None = None) -> PreHireResult:
     address = target.value if target.kind == "address" else None
     if address is None:
         outcome, address = await client.resolve_handle(target.value)
@@ -114,13 +121,28 @@ async def _run_check(ctx, target: Target, client, prober: Prober, live_probe: bo
                                  checked_at=_iso(time.time()))
 
     if live_probe:
-        lk, pr = await asyncio.gather(client.lookup(address), prober.probe(ctx, address))
+        lk, pr = await asyncio.gather(client.lookup(address),
+                                      _probe_until(prober, ctx, address, deadline))
     else:
         lk, pr = await client.lookup(address), None
     return build_result(query, address, lk, pr)
 
 
-def build_result(query: str, address: str, lk: Any, pr: ProbeResult | None) -> PreHireResult:
+async def _probe_until(prober: Prober, ctx: Any, address: str,
+                       deadline: float | None) -> ProbeResult | str:
+    """Probe result, or PENDING if `deadline` passes first. shield: the probe is shared and
+    cached, so giving up on waiting must not cancel it."""
+    if deadline is None:
+        return await prober.probe(ctx, address)
+    try:
+        return await asyncio.wait_for(asyncio.shield(prober.probe(ctx, address)),
+                                      max(0.05, deadline - time.monotonic()))  # 0.05: lets a cached result through
+    except asyncio.TimeoutError:
+        return PENDING
+
+
+def build_result(query: str, address: str, lk: Any,
+                 pr: ProbeResult | str | None) -> PreHireResult:
     fields: dict[str, Any] = {}
     static_ok = lk is not None and lk.outcome in ("ok", "partial") and lk.profile_status not in (
         "timeout", "api_down")
@@ -139,7 +161,10 @@ def build_result(query: str, address: str, lk: Any, pr: ProbeResult | None) -> P
         )
     static_note = "" if static_ok else f"profile {getattr(lk, 'outcome', 'unknown')}"
 
-    if pr is None:
+    if pr == PENDING:
+        status, detail = PENDING, "still_running"
+        pr = None
+    elif pr is None:
         status, detail = "unknown", "live probe not requested"
     elif pr.status in ("live", "degraded", "unreachable"):
         status, detail = pr.status, pr.detail
@@ -233,6 +258,7 @@ def format_text(r: PreHireResult, label: str) -> str:
         return "Sorry, I couldn't run the check right now. Please try again in a minute."
 
     head = {
+        PENDING: "CHECKING: no answer to my test message yet.",
         "live": "LIVE: it answered a test message just now.",
         "degraded": "DEGRADED: it acknowledged a test message but sent no answer in time.",
         "unreachable": "UNREACHABLE: no acknowledgement and no answer to a test message.",
@@ -245,6 +271,11 @@ def format_text(r: PreHireResult, label: str) -> str:
         lines.append(f"Live test: ack {ack} · answer {rep}")
         if r.detail.startswith("no_endpoint"):
             lines.append("_No reachable endpoint is registered for this address._")
+    elif r.status == PENDING:
+        # No "@" in the follow-up: on ASI:One "@other" routes the message to the other agent.
+        ask = who.lstrip("@") or "this agent"
+        lines.append(f"_I'm still waiting for its answer (up to {report.PROBE_WAIT_S}s). "
+                     f"Ask \"is {ask} live?\" again in a minute for the verdict._")
 
     if r.trust_score is not None:
         cp = "✅" if r.chat_protocol else "❌"
@@ -262,7 +293,9 @@ def format_text(r: PreHireResult, label: str) -> str:
         lines.append("_Agentverse profile data unavailable right now._")
 
     when = r.checked_at[11:16] + " UTC" if len(r.checked_at) >= 16 else "just now"
-    lines += ["", f"_Checked {when} with one test message. Results are cached for 10 minutes._"]
+    if r.status != PENDING:
+        lines += ["", f"_Checked {when} with one test message. "
+                      "Results are cached for 10 minutes._"]
     if r.address:
         lines.append(f"Full profile audit: `audit {r.address}`")
     return report.fit("\n".join(lines))
