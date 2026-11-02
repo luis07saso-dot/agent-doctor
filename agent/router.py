@@ -17,7 +17,9 @@ HELP = (
     "In ASI:One, leave out the @ before another agent's handle: an @handle may send "
     "your message to that agent instead.\n\n"
     "You get a 0-100 score, a verdict and the top 3 fixes (README, Chat Protocol, "
-    "handle, avatar, status, rating, Testing and more). Free."
+    "handle, avatar, status, rating, Testing and more). Free.\n\n"
+    "Before you rely on an agent, ask `is weather-bot live?` or `pre-hire check agent1q...`: "
+    "I send it one test message and tell you if it really answers."
 )
 
 OFF_SCOPE = (
@@ -38,6 +40,14 @@ BAD_ADDRESS = (
 )
 
 NON_TEXT = "I can only read text. Send an agent address, @handle or Agentverse profile link."
+
+PREHIRE_NEED_TARGET = (
+    "**Pre-Hire Check** tells you if an agent really answers right now: I send it one test "
+    "message, time its acknowledgement and answer, and add its Agentverse rating and profile "
+    "score.\n\n"
+    "Which agent? Send its address or handle, e.g. `pre-hire check agent1q...` or "
+    "`is weather-bot live?` (no @)."
+)
 
 RATE_LIMITED = "You're sending messages fast. Please wait a minute, then try again."
 
@@ -73,11 +83,18 @@ _REQUEST = re.compile(r"\b(audit|check|scan|review|rank|score|rate|fix|improve|a
                       re.IGNORECASE)
 _AGENT_WORD = re.compile(r"\b(agents?|agentverse|asi|uagents?|bot|handle|address|readme|profile|"
                          r"listing|marketplace|ranking|doctor|pre-?hire)\b", re.IGNORECASE)
+# Pre-Hire Check wording: "pre-hire check X", "probe X", "ping X", "is X live/online/...?".
+_PREHIRE = re.compile(r"\bpre-?hire\b|\bprobe\b|\bping\b", re.IGNORECASE)
+_LIVE_Q = re.compile(
+    r"\b(?:is|are|check (?:if|whether))\b.{0,100}?"
+    r"\b(?:live|alive|online|reachable|responsive|responding|answering|up(?=\s*[?.!]*\s*$))\b",
+    re.IGNORECASE | re.DOTALL)
 _GREETING = re.compile(r"^\W*(hi|hello|hey|help|start|menu|commands?|usage|what can you do|"
                        r"what do you do|who are you|how does (?:this|it) work|thanks?|thank you)\b",
                        re.IGNORECASE)
 
-Kind = Literal["audit", "help", "need_target", "bad_address", "off_scope"]
+Kind = Literal["audit", "prehire", "help", "need_target", "prehire_need_target", "bad_address",
+               "off_scope"]
 
 
 @dataclass(frozen=True)
@@ -91,8 +108,9 @@ def classify(text: str, self_handles: Iterable[str] = (),
     text = (text or "").strip()
     self_addresses = tuple(a for a in self_addresses if a)
     ex = extract(text, ignore_handles=self_handles, ignore_addresses=self_addresses)
+    wants_prehire = bool(_PREHIRE.search(text) or _LIVE_Q.search(text))
     if ex.targets:
-        return Intent("audit", ex.targets)
+        return Intent("prehire" if wants_prehire else "audit", ex.targets)
     if ex.bad_address:
         return Intent("bad_address")
     for h in self_handles:  # "@agent-doctor hi" from ASI:One: judge the rest of the text
@@ -101,6 +119,9 @@ def classify(text: str, self_handles: Iterable[str] = (),
         text = re.sub(rf"@{re.escape(a)}(?![0-9a-z])", " ", text, flags=re.I).strip()
     if not text:
         return Intent("help")
+    if _PREHIRE.search(text) and _AGENT_WORD.search(text) or (
+            _LIVE_Q.search(text) and _AGENT_WORD.search(text)):
+        return Intent("prehire_need_target")  # "pre-hire check", "is my agent live?"
     if _REQUEST.search(text) and _AGENT_WORD.search(text):
         return Intent("need_target")  # "audit my agent": about agents but no target yet
     if _AGENT_WORD.search(text) or _GREETING.search(text):
@@ -113,6 +134,7 @@ def reply_for(kind: Kind) -> str:
     return {
         "help": HELP,
         "need_target": NEED_TARGET,
+        "prehire_need_target": PREHIRE_NEED_TARGET,
         "bad_address": BAD_ADDRESS,
         "off_scope": OFF_SCOPE,
     }[kind]

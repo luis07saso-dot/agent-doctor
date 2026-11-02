@@ -4,7 +4,7 @@ Accepted target forms (anywhere in a sentence; ASI:One often rewrites messages):
 - address:  agent1q... (bech32, checksum verified)
 - handle:   @some-handle (lowercased; emails like a@b.com are ignored)
             or a hyphenated handle WITHOUT "@" right after an audit word
-            ("audit agent-listing-generator"): in a new ASI:One chat an @handle can route
+            ("audit agent-listing-generator", "is weather-bot live?"): in a new ASI:One chat an @handle can route
             the message to that agent instead of us (docs/smoke-test.md).
 - URL:      any URL containing an address, e.g.
             https://agentverse.ai/agents/details/agent1q.../profile
@@ -37,11 +37,21 @@ _HANDLE = re.compile(r"(?<![A-Za-z0-9._%+\-/@])@([A-Za-z0-9_-]++)(?!@|\.[A-Za-z0
 # "@": @handles are step 3). Hyphen required so plain words ("audit agentbuilder", "check
 # this") are never read as handles. Token not glued to "_", "@", "-" or a ".tld".
 _BARE_HANDLE = re.compile(
-    r"\b(?:audit|check|scan|review|score|rate|grade|analy[sz]e|diagnose|inspect|test)\b"
+    r"\b(?:audit|check|scan|review|score|rate|grade|analy[sz]e|diagnose|inspect|test|probe|ping)\b"
     r"(?:[\s:,]+(?:the|this|that|my|our|out|agent|handle|called|named|please|on|agentverse)\b){0,3}"
     r"[\s:,]+([a-z0-9]++(?:-[a-z0-9]++)++)(?![A-Za-z0-9_@-]|\.[A-Za-z0-9])",
     re.IGNORECASE,
 )
+# "is weather-bot live?" (Pre-Hire Check wording): hyphenated handle between "is" and a
+# liveness word. Same token rules as _BARE_HANDLE.
+_LIVE_HANDLE = re.compile(
+    r"\b(?:is|are)[\s:,]+(?:the[\s:,]+)?(?:agent[\s:,]+)?([a-z0-9]++(?:-[a-z0-9]++)++)"
+    r"(?![A-Za-z0-9_@-]|\.[A-Za-z0-9])[\s:,]+(?:still[\s:,]+)?"
+    r"(?:live|alive|online|up|reachable|responsive|responding|answering|working)\b",
+    re.IGNORECASE,
+)
+# Feature names that look like hyphenated handles ("check pre-hire") are never targets.
+_NOT_HANDLES = frozenset({"pre-hire", "pre-hire-check"})
 _URL_HANDLE = re.compile(r"/@([A-Za-z0-9_-]++)(?=[/?#]|$)")
 _TRAILING_PUNCT = ".,;:!?)]}>'\"`*_"
 
@@ -120,7 +130,9 @@ def extract(text: str, ignore_handles: Iterable[str] = (),
     # 4. Bare handles after an audit word. Not filtered by `ignore`: ASI:One adds
     #    "@agent-doctor", but a typed "audit agent-doctor" is a real self-audit request.
     for m in _BARE_HANDLE.finditer(masked_text):
-        _add_handle(found, m.start(1), m.group(1), set())
+        _add_handle(found, m.start(1), m.group(1), set(_NOT_HANDLES))
+    for m in _LIVE_HANDLE.finditer(masked_text):
+        _add_handle(found, m.start(1), m.group(1), set(_NOT_HANDLES))
 
     found.sort(key=lambda p: p[0])
     seen: set[Target] = set()
