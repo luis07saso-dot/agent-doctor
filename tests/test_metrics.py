@@ -175,6 +175,8 @@ def test_main_exit_codes(tmp_path):
 
 
 def test_exclude_file_in_repo_is_valid():
+    if not m.EXCLUDE.is_file():
+        pytest.skip("metrics_exclude.json is private (not in the public repo)")
     ex = m.load_exclude()
     assert ex and all(len(k) == 12 and int(k, 16) >= 0 for k in ex)
 
