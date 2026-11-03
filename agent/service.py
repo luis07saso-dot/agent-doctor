@@ -4,7 +4,7 @@ Never raises and never returns an empty reply. Outcome labels go to the request 
 ok | partial | not_found | invalid | api_down | timeout | help | need_target | bad_address |
 off_scope | fallback | fix_guide | fix_guide_none (Q5: no audit in this chat, or no such
 fix number), explain | explain_none (Q10 "why this score?": evidence for the last or named
-audit; none = no audit in this chat), card_profile (Q4 "Open profile" click), plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
+audit; none = no audit in this chat), forget | forget_error (Q15), card_profile (Q4 "Open profile" click), plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
 unknown | not_found | invalid | error | pending) and prehire_need_target.
 """
 from __future__ import annotations
@@ -15,7 +15,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Iterable, Optional, Protocol
 
-from agent import cards, evidence, findability, guides, router
+from agent import cards, evidence, findability, guides, recheck, router
 from agent.agentverse import Lookup
 from agent.extract import Target
 from agent.report import PROFILE_URL, TOP_FIXES, clean, fit, format_report
@@ -71,23 +71,31 @@ class Result:
 
 async def handle(text: str, client: LookupClient, self_handles: Iterable[str] = (),
                  self_addresses: Iterable[str] = (), prehire: Optional[PreHireFn] = None,
-                 probe: Optional[ProbeFn] = None, chat_key: str = "") -> Result:
+                 probe: Optional[ProbeFn] = None, chat_key: str = "",
+                 sender_key: str = "") -> Result:
     """`chat_key` identifies one chat (hashed sender + session). An audit remembers its top
-    fixes under it, so a later "how do I fix #2" in the same chat gets that fix's guide."""
+    fixes under it, so a later "how do I fix #2" in the same chat gets that fix's guide.
+    `sender_key` (hashed sender, Q15) keys the re-check diff and `forget`."""
     try:
-        return await _handle(text, client, self_handles, self_addresses, prehire, probe, chat_key)
+        return await _handle(text, client, self_handles, self_addresses, prehire, probe, chat_key,
+                             sender_key)
     except Exception:  # last line of defence: the caller still gets a reply
         return Result(router.FALLBACK, "fallback", "none")
 
 
 async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
                   self_addresses: Iterable[str] = (), prehire: Optional[PreHireFn] = None,
-                  probe: Optional[ProbeFn] = None, chat_key: str = "") -> Result:
+                  probe: Optional[ProbeFn] = None, chat_key: str = "",
+                  sender_key: str = "") -> Result:
     started = time.monotonic()
     has_audit = guides.LAST.get(chat_key) is not None
     intent = router.classify(text, self_handles, self_addresses, has_audit)
     if intent.kind == "fix_guide":
         return _fix_guide(intent.n, chat_key)
+    if intent.kind == "forget":
+        ok = await guides.LAST.memory.forget(diff_key(sender_key, chat_key), chat_key, sender_key)
+        return Result(router.FORGET_DONE if ok else router.FORGET_ERROR,
+                      "forget" if ok else "forget_error", "none")
     if intent.kind == "explain" and not intent.targets:
         return _explain(chat_key, text)
     if intent.kind not in ("audit", "prehire", "explain"):
@@ -137,7 +145,7 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         sc = score(lk)
         name = clean((lk.profile or {}).get("name")) or clean(target.label)
         shown = shown_for(lk, sc, name)
-        guides.LAST.put(chat_key, shown)
+        guides.LAST.put(chat_key, shown, sender_key)
         return Result(evidence.format_explain(shown, text), "explain", target.kind, n,
                       target.from_url, lk.cached)
 
@@ -151,10 +159,11 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
             return None
 
         live, find = await asyncio.gather(live_check(), _findability(client, lk, sc, started))
-        body = format_report(lk, sc, live=live, footer=footer, find=find)
+        diff = _recheck(lk, sc, diff_key(sender_key, chat_key))
+        body = format_report(lk, sc, live=live, footer=footer, find=find, diff=diff)
         name = clean((lk.profile or {}).get("name")) or clean(target.label)
         top = sc.fixes[:TOP_FIXES]
-        guides.LAST.put(chat_key, shown_for(lk, sc, name))
+        guides.LAST.put(chat_key, shown_for(lk, sc, name), sender_key)
         live_status = live if isinstance(live, str) else str(getattr(live, "status", "") or "")
         f_items = find.items if find is not None else ()
         return Result(body, lk.outcome, target.kind, n, target.from_url, lk.cached, live_status,
@@ -169,6 +178,28 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
     }.get(lk.outcome, router.FALLBACK)
     outcome = lk.outcome if lk.outcome in ("not_found", "invalid", "api_down", "timeout") else "fallback"
     return err(reply, outcome)
+
+
+def diff_key(sender_key: str, chat_key: str) -> str:
+    """Q15: re-check diff + forget key. Default per hashed sender (user decision 2026-11-03).
+    DIFF_KEY=chat in the VPS .env switches to per chat, e.g. if ASI:One turns out to relay
+    many people under one sender (unverified). Read per reply."""
+    return chat_key if os.getenv("DIFF_KEY", "").strip().lower() == "chat" else sender_key
+
+
+def _recheck(lk: Lookup, sc: Any, key: str) -> Any:
+    """Q15: diff vs the last check of this agent under `key`, then record this one. Only
+    clean data is recorded (no partial lookups or notes), so no false Fixed/New. Never raises."""
+    try:
+        if not key or not lk.address or lk.outcome != "ok" or lk.notes:
+            return None
+        mem = guides.LAST.memory
+        now = mem.clock()
+        prev = mem.seen_get(key, lk.address)
+        mem.seen_put(key, lk.address, recheck.record(sc, now))
+        return recheck.compare(prev, sc, now)
+    except Exception:
+        return None
 
 
 async def _findability(client: Any, lk: Lookup, sc: Any, started: float) -> Any:
@@ -210,7 +241,7 @@ PROFILE_OPENED = ("Opened the profile on Agentverse: [Open profile on Agentverse
 async def handle_card(sel: "cards.Selection", client: LookupClient,
                       self_handles: Iterable[str] = (), self_addresses: Iterable[str] = (),
                       prehire: Optional[PreHireFn] = None, probe: Optional[ProbeFn] = None,
-                      chat_key: str = "") -> Result:
+                      chat_key: str = "", sender_key: str = "") -> Result:
     """Q4: a click on an audit card. Never raises, never returns an empty reply."""
     try:
         if sel.action == cards.FIX:
@@ -223,7 +254,7 @@ async def handle_card(sel: "cards.Selection", client: LookupClient,
                     return Result(router.NO_AUDIT_YET, "fix_guide_none", "address")
                 sc = score(lk)
                 name = clean((lk.profile or {}).get("name")) or "this agent"
-                guides.LAST.put(chat_key, shown_for(lk, sc, name, sel.address))
+                guides.LAST.put(chat_key, shown_for(lk, sc, name, sel.address), sender_key)
             return _fix_guide(sel.n, chat_key)
         if sel.action == cards.PROFILE:
             return Result(PROFILE_OPENED.format(url=PROFILE_URL.format(address=sel.address)),
@@ -231,7 +262,7 @@ async def handle_card(sel: "cards.Selection", client: LookupClient,
         command = (f"audit {sel.address}" if sel.action == cards.RECHECK
                    else f"is {sel.address} live?")
         return await _handle(command, client, self_handles, self_addresses, prehire, probe,
-                             chat_key)
+                             chat_key, sender_key)
     except asyncio.TimeoutError:
         return Result(router.TIMEOUT, "timeout", "address", 1)
     except Exception:

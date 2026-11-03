@@ -22,7 +22,8 @@ HELP = (
     "Then ask `how do I fix #1` for step-by-step help. Free.\n\n"
     "Before you rely on an agent, ask `is weather-bot live?` or `pre-hire check agent1q...`: "
     "I send it one test message and tell you if it really answers.\n\n"
-    "Ask `why this score?` to see the data behind each check."
+    "Ask `why this score?` to see the data behind each check. "
+    "Send `forget` to delete what I stored for you."
 )
 
 OFF_SCOPE = (
@@ -250,7 +251,27 @@ _GREETING = re.compile(r"^\W*(hi|hello|hey|help|start|menu|commands?|usage|what 
                        re.IGNORECASE)
 
 Kind = Literal["audit", "prehire", "help", "need_target", "prehire_need_target", "bad_address",
-               "off_scope", "fix_guide", "faq", "explain", "explain_none"]
+               "off_scope", "fix_guide", "faq", "explain", "explain_none", "forget"]
+
+# Q15: "forget me" / "delete my data". A verb needs a data noun ("delete this" is not enough),
+# except "forget" on its own. Whole message only, so "forget it, audit X" is not one.
+_FORGET = re.compile(
+    r"^(?:please\s+)?(?:forget(?:\s+(?:me|us|everything|it all))?|"
+    r"(?:forget|delete|erase|wipe|clear|remove)\s+(?:all\s+)?(?:of\s+)?(?:(?:my|our|the|this)\s+)?"
+    r"(?:(?:stored|saved|audit|chat)\s+)?(?:data|history|memory|records?|info(?:rmation)?|"
+    r"audits?|everything))(?:\s+(?:please|now|thanks?|thank you))?$", re.IGNORECASE)
+
+
+def wants_forget(text: str) -> bool:
+    t = re.sub(r"[^\w\s'-]+", " ", text or "")
+    return bool(_FORGET.match(re.sub(r"\s+", " ", t).strip()))
+
+FORGET_DONE = (
+    "Done. I deleted what I stored for this ASI:One sender: recent audits and re-check "
+    "history. Request logs keep only hashed IDs and no message text; this doesn't change them."
+)
+FORGET_ERROR = ("I removed it from memory, but couldn't update the saved copy. "
+                "Please try `forget` again in a minute.")
 
 # Q10 (FB-2): questions about an audit ("why this score?", "how many unique users does X have?")
 # get the evidence, not a re-run of the audit. Narrow on purpose: "why isn't X ranking?" and
@@ -316,6 +337,8 @@ def classify(text: str, self_handles: Iterable[str] = (),
         text = re.sub(rf"@{re.escape(a)}(?![0-9a-z])", " ", text, flags=re.I).strip()
     if not text:
         return Intent("help")
+    if wants_forget(text):
+        return Intent("forget")
     n = fix_number(text, has_audit)
     if n:
         return Intent("fix_guide", n=n)
