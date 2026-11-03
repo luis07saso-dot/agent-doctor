@@ -18,8 +18,12 @@ It is built for agent builders asking "why is nobody finding my agent?". Think o
 - **Agentverse ranking checks**: active status, Chat Protocol, @handle, avatar, description, starter prompts, rating, interactions, ASI:One success rate, Testing results and website verification.
 - **ASI:One search visibility**: flags offline or unresponsive agents. Inactive agents are left out of ranking.
 - **Same input, same output**: rule-based scoring, no LLM guesswork. Results cached for 5 minutes.
-- **Free**. Usually replies in about a second. Replies that include a live test take up to 15 seconds.
+- **Free**. Quick answers take about a second. An audit also runs up to 3 Agentverse searches and waits at most 7 seconds for them. Replies that include a live test take up to 15 seconds.
 - **Pre-Hire Check (live test)**: ask `is my-weather-bot live?` and Agent Doctor sends that agent one test message, times its acknowledgement and answer, and adds its rating and profile score. Other agents can call it too (see "For agents").
+- **Why this score?**: after an audit, ask `why this score?` to see the data behind each check. A check Agentverse has no data for shows "no data" (0 points), not a failure.
+- **Findability test**: searches Agentverse for up to 3 of the agent's own starter prompts and shows where it ranks in the top 50, so you see whether users typing those words can find it.
+- **Re-check diff**: audit the same agent again and see the score change since the last check, with what was fixed and what is new.
+- **`forget`**: send `forget` to delete everything Agent Doctor stored for you.
 
 ## Usage
 
@@ -167,10 +171,33 @@ Allow up to about 45 seconds. Use `live_probe=False` for a profile-only answer, 
 
 If you send no address or @handle, Agent Doctor asks which agent to check. A mistyped address gets a "copy it again" reply, not a wrong report.
 
+## How it works
+
+Every chat message goes through the same steps. Agent Doctor acknowledges it first and aims to reply within 15 seconds.
+
+```text
+your message
+  → router: audit · Pre-Hire Check · fix guide · why this score? · forget · quick answer
+  → Agentverse lookup: public profile + Almanac record (cached 5 min)
+  → scorer: rule-based checks against the Agentverse ranking factors
+  → at the same time:
+       live test   (only if Agentverse flags the agent "unresponsive")
+       findability (up to 3 Agentverse searches for its starter prompts)
+  → re-check diff against your last check of the same agent
+  → report: score, verdict, top 3 fixes with How: lines
+```
+
+- **Rules decide, no AI model.** The score, the fixes and every answer come from fixed rules, so the same agent always gets the same score. No LLM reads your messages.
+- **Agents hiring agents.** Agent Doctor speaks the Agent Chat Protocol and its own `AgentDoctorPreHire` protocol. For a live test it messages the other agent over Agentverse, like any agent would, and times the reply.
+- **Data used**: public Agentverse endpoints only (agent search, agent profile, Almanac registration and handles). No private data, no logins.
+- **Privacy**: logs keep no message text, and sender IDs are hashed. To power fix guides, `why this score?` and the re-check diff, Agent Doctor stores the last audit shown in a chat (24 hours) and the last score and pass/fail of each check per agent you checked (30 days, up to 20 agents). Keys are hashed; only public agent data (name, address, score, check results) is kept. Send `forget` to delete it.
+- **Reliability**: an error gets a short "try again" reply, never silence or a crash. Rate limits and a loop guard stop runaway agent-to-agent loops (a conversation that keeps flooding is paused for 24 hours). Runs 24/7 on a dedicated server with a watchdog and one-step rollback.
+- **Tested**: 782 automated tests, plus live checks on ASI:One.
+
 ## Use cases
 
 - **Builders before launch**: run an agent audit before sharing your agent, fix the gaps, re-check.
-- **Agents with no traffic**: find out why an agent gets no impressions or picks, and improve agent discoverability.
+- **Agents with no traffic**: wondering "why is my agent not getting interactions?" Send its address or handle to see why it gets no impressions or picks, and improve agent discoverability.
 - **Hackathon teams**: check the profile meets the Agentverse ranking basics before judging.
 - **Agencies and teams with many agents**: get a quick, consistent score for each one.
 - **After every profile edit**: re-check to confirm the change landed (Agentverse can take a few minutes to update).
@@ -179,7 +206,9 @@ If you send no address or @handle, Agent Doctor asks which agent to check. A mis
 
 - **Scores the profile, not the agent's skills.** The audit only sends the agent a test message when Agentverse flags it "unresponsive" (to confirm or overturn the flag). Pre-Hire Check sends one on request. Either way: one short test message, at most once per agent every 10 minutes.
 - **Pre-Hire Check tests availability, not answer quality.** LIVE means the agent answered within 14 seconds; it does not judge the answer. An agent that acknowledges but answers after 14s shows as DEGRADED; one that does not even acknowledge shows as UNREACHABLE.
-- **Fix guides follow the last audit in the same chat.** `how do I fix #2` needs an audit earlier in that chat; it is kept in memory for 6 hours and lost if Agent Doctor restarts (just audit again). Guides follow the Agentverse docs; the Agentverse UI may change.
+- **Fix guides follow the last audit in the same chat.** `how do I fix #2` and `why this score?` need an audit earlier in that chat; it is kept for 24 hours, also across restarts. Guides follow the Agentverse docs; the Agentverse UI may change.
+- **Findability is information, not score.** It uses Agentverse search; ASI:One may rank agents differently. Agents without usable starter prompts get no findability line. A search that is slow shows "not checked": re-check a minute later.
+- **Re-check diff needs an earlier check.** It compares with your last complete check of the same agent in the past 30 days.
 - **Weights are our estimate.** Agentverse does not publish its ranking weights. The rubric follows the official docs' emphasis; the same input always gives the same score.
 - **Keywords are not checked yet.** Make sure each keyword appears in your README.
 - **Mainnet only.** Testnet agents are not checked.
@@ -197,8 +226,8 @@ If you send no address or @handle, Agent Doctor asks which agent to check. A mis
 - **Address**: `agent1qwm50eahtwxe2jsjnqqgj3yqmcrpft3rkd42g8frh9twvdwugazfg3897tp`
 - **Protocols**: Agent Chat Protocol 0.3.0, AgentDoctorPreHire 0.1.0
 - **Data sources**: public Agentverse search and Almanac APIs
-- **Privacy**: logs keep no message text; sender IDs are hashed
+- **Privacy**: logs keep no message text; sender IDs are hashed; `forget` deletes stored audits
 - **Price**: free
-- **Version**: 0.9.0
+- **Version**: 0.10.0
 - **Maintainer**: [leedr.tech](https://leedr.tech)
 - **Built for**: Stranger Builds hackathon, Fetch.ai track
