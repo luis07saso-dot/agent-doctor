@@ -3,7 +3,8 @@
 Never raises and never returns an empty reply. Outcome labels go to the request log:
 ok | partial | not_found | invalid | api_down | timeout | help | need_target | bad_address |
 off_scope | fallback | fix_guide | fix_guide_none (Q5: no audit in this chat, or no such
-fix number), card_profile (Q4 "Open profile" click), plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
+fix number), explain | explain_none (Q10 "why this score?": evidence for the last or named
+audit; none = no audit in this chat), card_profile (Q4 "Open profile" click), plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
 unknown | not_found | invalid | error | pending) and prehire_need_target.
 """
 from __future__ import annotations
@@ -14,7 +15,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Iterable, Optional, Protocol
 
-from agent import cards, guides, router
+from agent import cards, evidence, guides, router
 from agent.agentverse import Lookup
 from agent.extract import Target
 from agent.report import PROFILE_URL, TOP_FIXES, clean, fit, format_report
@@ -80,14 +81,20 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
     intent = router.classify(text, self_handles, self_addresses, has_audit)
     if intent.kind == "fix_guide":
         return _fix_guide(intent.n, chat_key)
-    if intent.kind not in ("audit", "prehire"):
+    if intent.kind == "explain" and not intent.targets:
+        return _explain(chat_key, text)
+    if intent.kind not in ("audit", "prehire", "explain"):
         text_, outcome = router.reply(intent)
         return Result(text_, outcome, "none")
 
     def soft_miss() -> Result:
         """A guessed mid-sentence handle Agentverse didn't confirm: answer the message as if
         there were no handle in it. Never an error reply for a guess."""
-        text_, outcome = router.reply(intent.fallback or router.Intent("help"))
+        fb = intent.fallback or router.Intent("help")
+        if fb.kind == "explain":
+            r = _explain(chat_key, text)
+            return Result(r.text, r.outcome, "soft_miss")
+        text_, outcome = router.reply(fb)
         return Result(text_, outcome, "soft_miss")
 
     target: Target = intent.targets[0]
@@ -119,6 +126,14 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         return err(router.TIMEOUT if lk.profile_status == "timeout" else router.API_DOWN,
                    lk.profile_status)
 
+    if lk.outcome in ("ok", "partial") and intent.kind == "explain":
+        sc = score(lk)
+        name = clean((lk.profile or {}).get("name")) or clean(target.label)
+        shown = shown_for(lk, sc, name)
+        guides.LAST.put(chat_key, shown)
+        return Result(evidence.format_explain(shown, text), "explain", target.kind, n,
+                      target.from_url, lk.cached)
+
     if lk.outcome in ("ok", "partial"):
         sc = score(lk)
         live = None
@@ -127,7 +142,7 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         body = format_report(lk, sc, live=live, footer=footer)
         name = clean((lk.profile or {}).get("name")) or clean(target.label)
         top = sc.fixes[:TOP_FIXES]
-        guides.LAST.put(chat_key, guides.Shown(name, lk.address or "", top))
+        guides.LAST.put(chat_key, shown_for(lk, sc, name))
         live_status = live if isinstance(live, str) else str(getattr(live, "status", "") or "")
         return Result(body, lk.outcome, target.kind, n, target.from_url, lk.cached, live_status,
                       _card(name, lk.address or "", sc, top))
@@ -176,8 +191,7 @@ async def handle_card(sel: "cards.Selection", client: LookupClient,
                     return Result(router.NO_AUDIT_YET, "fix_guide_none", "address")
                 sc = score(lk)
                 name = clean((lk.profile or {}).get("name")) or "this agent"
-                guides.LAST.put(chat_key, guides.Shown(name, lk.address or sel.address,
-                                                       sc.fixes[:TOP_FIXES]))
+                guides.LAST.put(chat_key, shown_for(lk, sc, name, sel.address))
             return _fix_guide(sel.n, chat_key)
         if sel.action == cards.PROFILE:
             return Result(PROFILE_OPENED.format(url=PROFILE_URL.format(address=sel.address)),
@@ -190,6 +204,20 @@ async def handle_card(sel: "cards.Selection", client: LookupClient,
         return Result(router.TIMEOUT, "timeout", "address", 1)
     except Exception:
         return Result(router.FALLBACK, "fallback", "none")
+
+
+def shown_for(lk: Lookup, sc: Any, name: str, address: str = "") -> guides.Shown:
+    """What a chat remembers about an audit: top fixes (Q5) + the evidence (Q10)."""
+    return guides.Shown(name, lk.address or address, sc.fixes[:TOP_FIXES], sc.total, sc.verdict,
+                        evidence.rows(lk, sc), tuple(evidence.facts(lk.profile).items()))
+
+
+def _explain(chat_key: str, text: str) -> Result:
+    """Q10: "why this score?" about this chat's last audit. No lookup, no I/O."""
+    shown = guides.LAST.get(chat_key)
+    if shown is None or not shown.rows:
+        return Result(router.EXPLAIN_NONE, "explain_none", "none")
+    return Result(evidence.format_explain(shown, text), "explain", "none")
 
 
 def _fix_guide(n: int, chat_key: str) -> Result:

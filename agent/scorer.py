@@ -7,7 +7,7 @@ points lost (ties: rubric order).
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from agent import rubric as R
@@ -23,6 +23,9 @@ class Check:
     ok: bool  # full marks
     detail: str  # short, user-facing ("4.5/5", "missing", ...)
     fix: str  # what to do; empty when ok
+    # Q10 (FB-2): ok = full marks; found = the data shows a gap; no_data = Agentverse gave no
+    # value (null). no_data still scores 0 (user decision 2026-11-03) but is shown as a Tip.
+    kind: str = "found"
 
     @property
     def lost(self) -> float:
@@ -47,9 +50,11 @@ class Score:
             bad = [c for c in bad if c.rule not in ("readme", "readme_sections")]
             bad.append(Check("readme", 0.0, readme.max_points + sections.max_points, False,
                              readme.detail, "Write a Markdown README with sections: "
-                             + ", ".join(R.README_SECTIONS)))
+                             + ", ".join(R.README_SECTIONS), "found"))
         # Offline trumps everything: only active agents are considered in ranking.
-        return tuple(sorted(bad, key=lambda c: (c.rule != "active", -c.lost, order.index(c.rule))))
+        # Then found problems before no-data tips (Q10), then points lost, then rubric order.
+        return tuple(sorted(bad, key=lambda c: (c.rule != "active", c.kind == "no_data",
+                                                -c.lost, order.index(c.rule))))
 
     def check(self, rule: str) -> Check:
         return next(c for c in self.checks if c.rule == rule)
@@ -75,14 +80,17 @@ def score(lookup: Any) -> Score:
         _interactions(profile.get("total_interactions")),
         _rate("success_rate", profile.get("recent_success_rate"),
               "Get real users chatting via ASI:One; answer every in-scope question well",
-              "none yet"),
+              _success_no_data(profile.get("recent_verified_interactions"))),
         _rate("eval_rate", profile.get("recent_eval_success_rate"),
               "Run Agentverse Testing (Testing tab) with real in-scope questions",
-              "none yet"),
+              "No Testing score from Agentverse yet: run Agentverse Testing with real "
+              "in-scope questions"),
         _website(profile.get("domain")),
         _starter_prompts(profile.get("starter_prompts")),
     ]
     assert [c.rule for c in checks] == list(R.WEIGHTS)
+    if not indexed:  # no profile at all: that is the detected gap, so no "no data" tips
+        checks = [replace(c, kind="found") if c.kind == "no_data" else c for c in checks]
     total = int(round(sum(c.points for c in checks)))
     total = max(0, min(100, total))
     down = not active
@@ -96,11 +104,26 @@ def _w(rule: str) -> float:
     return float(R.WEIGHTS[rule])
 
 
-def _mk(rule: str, frac: float, detail: str, fix: str) -> Check:
+def _mk(rule: str, frac: float, detail: str, fix: str, kind: str = "found") -> Check:
     frac = max(0.0, min(1.0, frac))
     pts = round(_w(rule) * frac, 2)
     ok = pts >= _w(rule)
-    return Check(rule, pts, _w(rule), ok, detail, "" if ok else fix)
+    return Check(rule, pts, _w(rule), ok, detail, "" if ok else fix, "ok" if ok else kind)
+
+
+NO_DATA = "no data"
+
+
+def _num(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _success_no_data(verified: Any) -> str:
+    """Fix for a null success rate. Q10/FB-2: null is not 0%. In 317 sampled agents it was
+    null exactly when recent_verified_interactions was 0 (docs/specs/q10-why-this-score.md F2)."""
+    if _num(verified) and verified == 0:
+        return "No success rate from Agentverse yet (0 verified chats): bring real users via ASI:One"
+    return "No success rate from Agentverse yet: bring real users via ASI:One"
 
 
 def _is_active(profile: dict, almanac: dict, almanac_known: bool, indexed: bool) -> bool:
@@ -183,10 +206,11 @@ def _readme(readme: str | None) -> Check:
 
 
 def _rating(rating: Any) -> Check:
-    r = rating if isinstance(rating, (int, float)) and not isinstance(rating, bool) else 0.0
-    r = max(0.0, min(R.RATING_MAX, float(r)))
-    return _mk("rating", r / R.RATING_MAX, f"{r:g}/{R.RATING_MAX:g}",
-               "Raise rating: pass Agentverse Testing runs and get real ASI:One users")
+    fix = "Raise rating: pass Agentverse Testing runs and get real ASI:One users"
+    if not _num(rating):
+        return _mk("rating", 0, NO_DATA, fix, "no_data")
+    r = max(0.0, min(R.RATING_MAX, float(rating)))
+    return _mk("rating", r / R.RATING_MAX, f"{r:g}/{R.RATING_MAX:g}", fix)
 
 
 def _description(desc: Any) -> Check:
@@ -228,14 +252,15 @@ def _avatar(href: Any) -> Check:
 
 
 def _interactions(total: Any) -> Check:
-    n = total if isinstance(total, int) and not isinstance(total, bool) else 0
-    return _mk("interactions", 1 if n >= R.MIN_INTERACTIONS else 0, f"{n:,}",
-               f"Reach {R.MIN_INTERACTIONS}+ interactions (run Testing; share with real users)")
+    fix = f"Reach {R.MIN_INTERACTIONS}+ interactions (run Testing; share with real users)"
+    if not (isinstance(total, int) and not isinstance(total, bool)):
+        return _mk("interactions", 0, NO_DATA, fix, "no_data")
+    return _mk("interactions", 1 if total >= R.MIN_INTERACTIONS else 0, f"{total:,}", fix)
 
 
-def _rate(rule: str, value: Any, fix: str, none_detail: str) -> Check:
-    if not isinstance(value, (int, float)) or isinstance(value, bool):
-        return _mk(rule, 0, none_detail, fix)
+def _rate(rule: str, value: Any, fix: str, no_data_fix: str) -> Check:
+    if not _num(value):
+        return _mk(rule, 0, NO_DATA, no_data_fix, "no_data")
     v = max(0.0, min(1.0, float(value)))
     return _mk(rule, v, f"{v:.0%}", fix)
 

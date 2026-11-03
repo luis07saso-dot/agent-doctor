@@ -106,10 +106,13 @@ def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "") ->
         f"ASI:One success: {c('success_rate').detail} · Testing: {c('eval_rate').detail} · "
         f"Website: {safe_domain(c('website').detail) if c('website').ok else 'none'} · Starter prompts: {c('starter_prompts').detail}",
         "",
-        "_Keywords are private, so not scored: put each one in your README. "
-        "Weights are our estimate (Agentverse doesn't publish them)._",
+        "_Weights are our estimate (Agentverse doesn't publish them). "
+        "Keywords are private, so not scored._",
     ]
-    tail = ["", ("Ask \"how do I fix #1\" for step-by-step help. " if fixes else "")
+    if any(f.kind == "no_data" for f in fixes):  # Q10: legend only when a Tip is listed
+        details.append("_Tip = no data from Agentverse, general advice._")
+    tail = ["", ("Ask \"how do I fix #1\" for step-by-step help, or \"why this score?\" for the "
+                 "evidence. " if fixes else "Ask \"why this score?\" for the evidence. ")
             + "Re-check any time after changes."]
     if lookup.address:
         tail += ["", f"[Open profile on Agentverse]({PROFILE_URL.format(address=lookup.address)})"]
@@ -123,7 +126,8 @@ def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "") ->
                 how = hows[i - 1] if i <= n_how else ""
                 # Two trailing spaces = Markdown hard break: ASI:One would otherwise join the
                 # how-to onto the fix line. Renderers without hard breaks still show one line.
-                body.append(f"{i}. {f.fix} (+{_pts(f.lost)} pts)" + ("  " if how else ""))
+                tag = "Tip" if f.kind == "no_data" else "Found"  # Q10 (FB-2)
+                body.append(f"{i}. {tag}: {f.fix} (+{_pts(f.lost)} pts)" + ("  " if how else ""))
                 if how:
                     body.append(f"   {how}")
         else:

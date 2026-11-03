@@ -94,11 +94,15 @@ def test_fixtures_in_expected_order():
 
 def test_fixes_ranked_by_points_lost():
     s = score(fixture("weak"))
-    lost = [c.lost for c in s.fixes]
-    assert lost == sorted(lost, reverse=True)
+    # Q10: found problems first, then no-data tips; each group by points lost.
+    for kind in ("found", "no_data"):
+        lost = [c.lost for c in s.fixes if c.kind == kind]
+        assert lost == sorted(lost, reverse=True)
+    kinds = [c.kind for c in s.fixes]
+    assert kinds == sorted(kinds, key=lambda k: k == "no_data")
     d = score(fixture("dead"))
     assert d.fixes[0].rule == "active"  # offline first, even if a bigger fix exists
-    rest = [c.lost for c in d.fixes[1:]]
+    rest = [c.lost for c in d.fixes[1:] if c.kind == "found"]
     assert rest == sorted(rest, reverse=True)
     assert all(c.fix for c in s.fixes)
 
@@ -207,7 +211,7 @@ def test_rule_interactions():
 def test_rule_success_rate():
     assert with_("recent_success_rate", 0.5).check("success_rate").points == 2
     c = with_("recent_success_rate", None).check("success_rate")
-    assert c.points == 0 and c.detail == "none yet"
+    assert c.points == 0 and c.detail == "no data"  # Q10: null is no data, not 0%
 
 
 def test_rule_eval_rate():
