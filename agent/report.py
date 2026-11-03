@@ -48,7 +48,7 @@ def _pts(x: float) -> str:
 
 
 def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "",
-                  find: Any = None) -> str:
+                  find: Any = None, diff: Any = None) -> str:
     """`live` (Q2): ProbeResult of a live check, "pending" if it didn't finish in time, or
     None (not run). Only used when Agentverse flags the agent unresponsive.
     `footer` (e.g. the multi-target note) goes last; the result incl. footer is <= MAX_CHARS.
@@ -57,7 +57,9 @@ def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "",
     would be too long. Q3 (FB-1.2): the profile link is its own paragraph at the end and is
     never trimmed (ASI:One merges single-newline lines into one paragraph).
     Q12: `find` (findability.Find) adds the search-rank line after Details. Info only. It is
-    shortened, then dropped, before any how-to line is."""
+    shortened, then dropped, before any how-to line is.
+    Q15: `diff` (recheck.Diff) adds a "since the last check" line under the score; it is
+    shortened, then dropped, before any how-to line, and kept over the findability line."""
     profile = lookup.profile or {}
     name = clean(profile.get("name")) or "Unnamed agent"
     handle = profile.get("handle")
@@ -122,9 +124,13 @@ def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "",
     tail_text = "\n" + "\n".join(tail) + footer
 
     find_levels = (0, 1, 2, 3, 4) if find is not None and getattr(find, "items", ()) else (4,)
+    diff_levels = (0, 1, 2) if diff is not None else (2,)
 
-    def build(n_how: int, find_level: int = 4) -> str:
+    def build(n_how: int, find_level: int = 4, diff_level: int = 2) -> str:
         body = list(head)
+        line = diff.line(diff_level) if diff is not None else ""
+        if line:
+            body.insert(2, line)  # right under the score line
         if fixes:
             body += ["", "**Top fixes**"]
             for i, f in enumerate(fixes, 1):
@@ -141,10 +147,11 @@ def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "",
         return "\n".join(body + details + (["", block] if block else []))
 
     for n_how in range(len(fixes), -1, -1):
-        for level in find_levels:
-            text = build(n_how, level) + tail_text
-            if len(text) <= MAX_CHARS:
-                return text
+        for d_level in diff_levels:
+            for level in find_levels:
+                text = build(n_how, level, d_level) + tail_text
+                if len(text) <= MAX_CHARS:
+                    return text
     return fit(build(0), tail_text)
 
 

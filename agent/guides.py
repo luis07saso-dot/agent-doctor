@@ -13,9 +13,8 @@ Pure text, no I/O.
 from __future__ import annotations
 
 import time
-from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 from agent import rubric as R
 from agent.scorer import UNRESPONSIVE_FLAG, Check
@@ -301,31 +300,22 @@ class Shown:
 
 
 class LastAudit:
-    """Per-chat memory of the last audit's top fixes. In memory only: a restart forgets it,
-    and the reply then asks for a fresh audit. Bounded and expiring."""
+    """Per-chat memory of the last audit (Q5 fixes, Q10 evidence). Q15: backed by
+    memory.Memory; after attach(path) it survives restarts. Bounded and expiring."""
 
-    def __init__(self, ttl_s: float = 6 * 3600, max_items: int = 5000) -> None:
-        self.ttl_s = ttl_s
-        self.max_items = max_items
-        self._items: OrderedDict[str, tuple[float, Shown]] = OrderedDict()
+    def __init__(self, ttl_s: float = 24 * 3600, max_items: int = 500,
+                 clock: Callable[[], float] = time.time) -> None:
+        from agent.memory import Memory
+        self.memory = Memory(None, clock=clock, chat_ttl=ttl_s, chat_max=max_items)
 
-    def put(self, key: str, shown: Shown) -> None:
-        if not key:
-            return
-        self._items.pop(key, None)
-        self._items[key] = (time.monotonic(), shown)
-        while len(self._items) > self.max_items:
-            self._items.popitem(last=False)
+    def attach(self, path: str) -> None:
+        self.memory.attach(path)
+
+    def put(self, key: str, shown: Shown, sender_key: str = "") -> None:
+        self.memory.put_chat(key, shown, sender_key)
 
     def get(self, key: str) -> Optional[Shown]:
-        item = self._items.get(key) if key else None
-        if item is None:
-            return None
-        at, shown = item
-        if time.monotonic() - at > self.ttl_s:
-            self._items.pop(key, None)
-            return None
-        return shown
+        return self.memory.get_chat(key)
 
 
 LAST = LastAudit()

@@ -273,9 +273,8 @@ def test_latest_audit_wins():
 
 
 def test_memory_expires_and_is_bounded(monkeypatch):
-    mem = guides.LastAudit(ttl_s=10, max_items=2)
     t = [100.0]
-    monkeypatch.setattr(guides.time, "monotonic", lambda: t[0])
+    mem = guides.LastAudit(ttl_s=10, max_items=2, clock=lambda: t[0])  # Q15: injected clock
     s = guides.Shown("A", "", ())
     mem.put("a", s), mem.put("b", s), mem.put("c", s)
     assert mem.get("a") is None and mem.get("c") is s

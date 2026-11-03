@@ -1,7 +1,10 @@
 """Entry point: python -m agent.main"""
+import os
+from typing import Optional
+
 from uagents import Agent
 
-from agent import chat, config, profile
+from agent import chat, config, guides, profile
 from agent.chat import chat_proto
 from agent.prehire import prehire_proto
 from agent.probe import PROBER
@@ -38,6 +41,7 @@ def build(settings: config.Settings, publish_manifests: bool = True, **overrides
 
     @agent.on_event("shutdown")
     async def _close_client(ctx) -> None:
+        await guides.LAST.memory.flush()  # Q15: don't lose the last debounced save
         await chat.CLIENT.aclose()
 
     return agent
@@ -58,5 +62,17 @@ def _publish_starter_prompts(agent: Agent) -> None:
     agent._build_registration_profile = _with_prompts
 
 
+def memory_path(address: str) -> Optional[str]:
+    """Q15 memory file. MEMORY=0 -> in memory only. MEMORY_PATH overrides. Default: the cwd
+    (/data in Docker, on the agent-data volume), one file per agent address."""
+    if os.getenv("MEMORY", "").strip() == "0":
+        return None
+    return os.getenv("MEMORY_PATH") or os.path.join(os.getcwd(), f"doctor_memory_{address[:16]}.json")
+
+
 if __name__ == "__main__":
-    build(config.load()).run()
+    agent = build(config.load())
+    path = memory_path(agent.address)
+    if path:  # never in build(): tests build agents too
+        guides.LAST.attach(path)
+    agent.run()

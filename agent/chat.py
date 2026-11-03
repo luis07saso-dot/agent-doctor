@@ -141,7 +141,7 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
             return
 
         common = dict(prehire=run_prehire, probe=lambda address: PROBER.probe(ctx, address),
-                      chat_key=hash_id(f"{sender}|{_session(ctx)}"))
+                      chat_key=hash_id(f"{sender}|{_session(ctx)}"), sender_key=hash_id(sender))
         sel = cards.parse_selection(text)  # Q4: a click on an audit card?
         if sel is not None:
             res = await service.handle_card(sel, CLIENT, SELF_HANDLES, SELF_ADDRESSES, **common)
