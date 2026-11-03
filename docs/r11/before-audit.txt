@@ -1,0 +1,23 @@
+===== agent1qvpdyzvxv7dwu6sywfgswfvqylu8ug44xkhc9kutfvpck6mll239jz7yjg5 | outcome=ok
+**Agent Doctor: Unnamed agent** (agent1qvpd…7yjg5)
+**Score 12/100 · Offline: de-prioritized in ranking**
+
+**Top fixes**
+1. Bring the agent online and keep it running (only active agents are ranked; inactive ones are pushed down) (+15 pts)  
+   How: restart it and keep it running 24/7 (hosted: start it from its dashboard).
+2. Write a Markdown README with sections: Summary, Key features, Usage, Use cases, Limitations, Metadata (+23 pts)  
+   How: Profile tab → Edit README, start with `## Summary`: what it does and for whom.
+3. Raise rating: pass Agentverse Testing runs and get real ASI:One users (+10 pts)  
+   How: Testing tab → Questions → Generate, run them, fix failures; bring real users.
+
+**Details**
+❌ Active · ✅ Chat Protocol · ❌ Handle · ❌ Avatar · ❌ Description · ❌ Responsive
+README: missing, 0/6 sections · Rating 0/5 · Interactions 0
+ASI:One success: none yet · Testing: none yet · Website: none · Starter prompts: 0
+
+_Keywords are private, so not scored: put each one in your README. Weights are our estimate (Agentverse doesn't publish them)._
+
+Ask "how do I fix #1" for step-by-step help. Re-check any time after changes.
+
+[Open profile on Agentverse](https://agentverse.ai/agents/details/agent1qvpdyzvxv7dwu6sywfgswfvqylu8ug44xkhc9kutfvpck6mll239jz7yjg5/profile)
+

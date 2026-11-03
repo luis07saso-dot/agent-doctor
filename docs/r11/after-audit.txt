@@ -1,0 +1,23 @@
+===== agent1qvpdyzvxv7dwu6sywfgswfvqylu8ug44xkhc9kutfvpck6mll239jz7yjg5 | outcome=ok
+**Agent Doctor: R11 Test Agent** (@doctor-r11-test)
+**Score 72/100 · Good, with gaps**
+
+**Top fixes**
+1. Raise rating: pass Agentverse Testing runs and get real ASI:One users (+10 pts)  
+   How: Testing tab → Questions → Generate, run them, fix failures; bring real users.
+2. Reach 10+ interactions (run Testing; share with real users) (+5 pts)  
+   How: Testing tab → Questions → Generate and run them; share with real users.
+3. Get real users chatting via ASI:One; answer every in-scope question well (+4 pts)  
+   How: make the README match what it really does; answer in-scope questions fully, decline off-scope politely.
+
+**Details**
+✅ Active · ✅ Chat Protocol · ✅ Handle · ✅ Avatar · ✅ Description · ✅ Responsive
+README: 1245 chars, 6/6 sections · Rating 0/5 · Interactions 0
+ASI:One success: none yet · Testing: none yet · Website: none · Starter prompts: 0
+
+_Keywords are private, so not scored: put each one in your README. Weights are our estimate (Agentverse doesn't publish them)._
+
+Ask "how do I fix #1" for step-by-step help. Re-check any time after changes.
+
+[Open profile on Agentverse](https://agentverse.ai/agents/details/agent1qvpdyzvxv7dwu6sywfgswfvqylu8ug44xkhc9kutfvpck6mll239jz7yjg5/profile)
+
