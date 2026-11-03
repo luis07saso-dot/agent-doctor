@@ -34,7 +34,7 @@ CROP_PROFILE_TOP = (400, 40, 1620, 1365)
 CROP_PROFILE_BOTTOM = (400, 311, 1620, 1365)
 CROP_CHAT = (420, 150, 1580, 1331)
 CROP_COMPOSER = (420, 345, 1580, 1331)
-CROP_PREHIRE = (420, 330, 1580, 1331)
+CROP_PREHIRE = (420, 362, 1560, 1314)  # as low as the source allows: trims most of the link-preview thumbnail
 CROP_PROFILE_D = (100, 623, 1250, 1053)  # left column only: header + README (skips owner-only side panel)
 
 
@@ -135,38 +135,36 @@ def main() -> None:
         tmp / "end.png")
 
     cap = {k: caption_png(t, n, tmp / f"cap_{k}.png") for k, (t, n) in {
-        "p1": ("Agent Doctor audits other agents", "Live on ASI:One"),
-        "p2": ("Ask it to audit any Agentverse agent", "Real ASI:One chat, no mockups"),
-        "a": (f"Score 0–100 + the <span {g}>top 3 fixes</span>", "With the points each fix adds"),
+        "p2": ("Agent Doctor audits any Agentverse agent", "Live on ASI:One. Real chat, no mockups"),
+        "a": (f"Score <span {g}>77/100</span> + the top 3 fixes", "agent-listing-generator, with the points each fix adds"),
         "b1": ("Ask how to fix #1", "Waiting sped up 2×"),
         "b2": (f"<span {g}>Step-by-step</span> + a copy-paste example", ""),
         "c1": ("Hiring an agent? Check it first", "Doctor sends it one test message. Waiting sped up 4×"),
-        "c2": (f"Flagged “unresponsive”. Actually <span {g}>LIVE</span>", "Answered Doctor's test message in 5.0 s"),
-        "d1": (f"Listed on Agentverse: <span {g}>Active</span>, ASI:One-ready", "Agent Doctor's profile"),
+        "c2": (f"Agentverse says “unresponsive”. Doctor: <span {g}>LIVE</span>", "ticketlens-agent answered the test message: ack 0.9 s, answer 5.0 s"),
+        "d1": (f"Listed on Agentverse: <span {g}>Active</span>, ASI Available", "Agent Doctor's profile"),
         "d2": ("A full README: what search reads first", "Summary · Key features · Usage · Use cases · Limitations"),
     }.items()}
 
     parts = [
         still(title, 3.0, tmp / "00.mp4"),
-        clip(a, 0.0, 2.2, CROP_PROFILE_TOP, cap["p1"], tmp / "01.mp4"),
         clip(a, 3.0, 5.8, CROP_PROFILE_BOTTOM, cap["p2"], tmp / "02.mp4"),
         freeze(a, 17.0, 6.0, CROP_CHAT, cap["a"], tmp / "03.mp4"),
         clip(b, 3.8, 7.0, CROP_COMPOSER, cap["b1"], tmp / "04.mp4"),
         clip(b, 7.0, 11.0, CROP_CHAT, cap["b1"], tmp / "05.mp4", speed=2.0),
-        freeze(b, 17.5, 5.0, CROP_CHAT, cap["b2"], tmp / "06.mp4"),
+        freeze(b, 17.5, 4.0, CROP_CHAT, cap["b2"], tmp / "06.mp4"),
         clip(b, 19.0, 21.0, CROP_CHAT, cap["b2"], tmp / "07.mp4"),
         clip(c, 1.5, 3.3, CROP_COMPOSER, cap["c1"], tmp / "08.mp4"),
         clip(c, 3.3, 13.0, CROP_PREHIRE, cap["c1"], tmp / "09.mp4", speed=4.0),
-        freeze(c, 16.0, 6.5, CROP_PREHIRE, cap["c2"], tmp / "10.mp4"),
+        freeze(c, 16.0, 6.0, CROP_PREHIRE, cap["c2"], tmp / "10.mp4"),
     ]
-    parts.append(still(r11, 3.5, tmp / "11.mp4"))
     d = RAW / "D-profile.mov"
     if d.is_file():
         parts += [
             freeze(d, 1.0, 3.0, CROP_PROFILE_D, cap["d1"], tmp / "11a.mp4"),
             clip(d, 9.5, 13.5, CROP_PROFILE_D, cap["d2"], tmp / "11b.mp4"),
         ]
-    parts.append(still(end, 4.5, tmp / "12.mp4"))
+    parts.append(still(r11, 3.5, tmp / "11.mp4"))
+    parts.append(still(end, 5.0, tmp / "12.mp4"))
 
     lst = tmp / "list.txt"
     lst.write_text("".join(f"file '{p}'\n" for p in parts))
