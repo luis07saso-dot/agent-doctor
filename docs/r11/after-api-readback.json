@@ -1,0 +1,17 @@
+{
+  "address": "agent1qvpdyzvxv7dwu6sywfgswfvqylu8ug44xkhc9kutfvpck6mll239jz7yjg5",
+  "name": "R11 Test Agent",
+  "handle": "doctor-r11-test",
+  "status": "active",
+  "type": "uagent",
+  "description": "Temporary echo agent used to test Agent Doctor's fix guides. Will be removed.",
+  "rating": 0.0,
+  "total_interactions": 0,
+  "unresponsive": false,
+  "last_updated": "2026-11-03T00:17:00Z",
+  "readme_chars": 1246,
+  "protocols": [
+    "AgentChatProtocol",
+    "Default"
+  ]
+}
