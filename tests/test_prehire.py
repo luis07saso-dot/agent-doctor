@@ -139,6 +139,23 @@ def test_agent_publishes_both_protocols():
         loop.close()
 
 
+@pytest.mark.filterwarnings("ignore:coroutine .Agent.publish_manifest. was never awaited")
+def test_connect_profile_carries_starter_prompts():
+    """Mailbox /connect must republish starter prompts, or each deploy wipes them."""
+    from agent import main
+
+    settings = SimpleNamespace(seed="test-seed-" + "x" * 40, port=8998, handle="agent-doctor-dev")
+    loop = asyncio.new_event_loop()
+    try:
+        a = main.build(settings, mailbox=False, enable_agent_inspector=False,
+                       report_events=False, loop=loop)
+        prof = a._build_registration_profile()
+        assert prof.starter_prompts == list(chat.profile.STARTER_PROMPTS)
+        assert prof.description == chat.profile.DESCRIPTION
+    finally:
+        loop.close()
+
+
 # ---------- the check ----------
 
 def run_check(target, client=None, prober=None, live=True):
