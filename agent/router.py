@@ -108,6 +108,8 @@ FAQ: dict[str, str] = {
         "- Profile: description, custom @handle, avatar, starter prompts\n"
         "- Track record: rating, 10+ interactions, success and evaluation rates\n"
         "- Website verification\n\n"
+        "I also test findability: where the agent ranks in Agentverse search for its own "
+        "starter prompts. Info only, not scored.\n\n"
         "You get a 0-100 score, a verdict and the top 3 fixes, each with how to do it. "
         "Pre-Hire Check (`is weather-bot live?`) also sends an agent one test message to see "
         "if it really answers.\n\n" + _NEXT
@@ -272,7 +274,12 @@ _STRONG_EXPLAIN = re.compile(r"\bthis score\b|\bwhy\b.{0,40}\bscor\w*|\bunique u
                              re.IGNORECASE | re.DOTALL)
 
 
+_LONG_TARGET = re.compile(r"https?://\S+|(?<![0-9a-z])agent1[0-9a-z]{20,}", re.IGNORECASE)
+
+
 def explain_wanted(text: str) -> bool:
+    # A 65-char address must not break the ".{0,40}" windows ("why is agent1q… scored low?").
+    text = _LONG_TARGET.sub("X", text)
     return bool(_EXPLAIN.search(text) and not _AUDIT_CMD.search(text)
                 and not (_PREHIRE.search(text) or _LIVE_Q.search(text))
                 and fix_number(text, True) == 0)
