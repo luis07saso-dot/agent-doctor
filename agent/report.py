@@ -47,14 +47,17 @@ def _pts(x: float) -> str:
     return f"{x:.1f}".rstrip("0").rstrip(".")
 
 
-def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "") -> str:
+def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "",
+                  find: Any = None) -> str:
     """`live` (Q2): ProbeResult of a live check, "pending" if it didn't finish in time, or
     None (not run). Only used when Agentverse flags the agent unresponsive.
     `footer` (e.g. the multi-target note) goes last; the result incl. footer is <= MAX_CHARS.
 
     Q5: each top fix gets a one-line how-to; dropped from the last fix up if the report
     would be too long. Q3 (FB-1.2): the profile link is its own paragraph at the end and is
-    never trimmed (ASI:One merges single-newline lines into one paragraph)."""
+    never trimmed (ASI:One merges single-newline lines into one paragraph).
+    Q12: `find` (findability.Find) adds the search-rank line after Details. Info only. It is
+    shortened, then dropped, before any how-to line is."""
     profile = lookup.profile or {}
     name = clean(profile.get("name")) or "Unnamed agent"
     handle = profile.get("handle")
@@ -118,7 +121,9 @@ def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "") ->
         tail += ["", f"[Open profile on Agentverse]({PROFILE_URL.format(address=lookup.address)})"]
     tail_text = "\n" + "\n".join(tail) + footer
 
-    def build(n_how: int) -> str:
+    find_levels = (0, 1, 2, 3, 4) if find is not None and getattr(find, "items", ()) else (4,)
+
+    def build(n_how: int, find_level: int = 4) -> str:
         body = list(head)
         if fixes:
             body += ["", "**Top fixes**"]
@@ -132,13 +137,43 @@ def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "") ->
                     body.append(f"   {how}")
         else:
             body += ["", "No fixes needed. Keep it online and answering."]
-        return "\n".join(body + details)
+        block = find_block(find, c("active").ok, find_level) if find_level < 4 else ""
+        return "\n".join(body + details + (["", block] if block else []))
 
     for n_how in range(len(fixes), -1, -1):
-        text = build(n_how) + tail_text
-        if len(text) <= MAX_CHARS:
-            return text
+        for level in find_levels:
+            text = build(n_how, level) + tail_text
+            if len(text) <= MAX_CHARS:
+                return text
     return fit(build(0), tail_text)
+
+
+FIND_HEAD = "🔍 Agentverse search (top 50): "
+FIND_ADVICE = " Use those words in your README."
+
+
+def find_block(find: Any, active: bool, level: int = 0) -> str:
+    """Q12 line. level 0: 40-char phrases + advice; 1: no advice; 2: 28-char phrases;
+    3: counts only."""
+    items = getattr(find, "items", ()) or ()
+    if not items:
+        return ""
+    if level >= 3:
+        checked = [rk for _, st, rk in items if st == "ok"]
+        if not checked:
+            return "🔍 Agentverse search: not checked yet. Re-check in a minute."
+        return (f"🔍 Agentverse search: in the top 50 for {sum(1 for r in checked if r)} of "
+                f"{len(checked)} starter prompts.")
+    width = 28 if level >= 2 else 40
+    parts = []
+    for phrase, status, rank in items:
+        res = "not checked" if status != "ok" else (f"#{rank}" if rank else "not found")
+        parts.append(f"\"{clean(phrase, width)}\" {res}")
+    line = FIND_HEAD + " · ".join(parts)
+    missing = any(st == "ok" and not rk for _, st, rk in items)
+    if level == 0 and missing and active:
+        line += "." + FIND_ADVICE
+    return line
 
 
 def _flag_note(profile: dict, live: Any = None, ask: str = "") -> str:

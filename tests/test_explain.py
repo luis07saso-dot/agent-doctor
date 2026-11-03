@@ -210,6 +210,8 @@ def test_explain_fits_with_all_topics(name):
     ("audit weather-bot and explain the score", False, "audit"),
     (f"audit {ADDR}", True, "audit"),
     ("is weather-bot live?", False, "prehire"),
+    (f"why is {ADDR} scored like this?", False, "explain"),
+    (f"why is https://agentverse.ai/agents/details/{ADDR}/profile rated so low?", False, "explain"),
     ("is it free?", True, "faq"),
     ("how do I rank higher?", True, "faq"),
 ])

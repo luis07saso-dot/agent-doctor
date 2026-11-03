@@ -153,6 +153,9 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
             extra["click"] = sel.action
         if res.card:
             extra["card"] = True
+        if res.find:  # Q12: counts only, never the phrases
+            extra["find"] = res.find
+            extra["find_top50"] = res.find_top50
         log_request(ctx, sender, res.input_type, res.outcome, started, targets=res.targets,
                     via_url=res.via_url, cached=res.cached, **extra, **meta)
     except Exception as e:

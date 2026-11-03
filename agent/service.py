@@ -15,7 +15,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Iterable, Optional, Protocol
 
-from agent import cards, evidence, guides, router
+from agent import cards, evidence, findability, guides, router
 from agent.agentverse import Lookup
 from agent.extract import Target
 from agent.report import PROFILE_URL, TOP_FIXES, clean, fit, format_report
@@ -35,6 +35,11 @@ PREHIRE_HARD_TIMEOUT_S = REPLY_BUDGET_S + 2.0
 AUDIT_BUDGET_S = REPLY_BUDGET_S
 MIN_PROBE_S = 1.0  # less than this left: don't wait, report the check as still running
 LIVE_PENDING = "pending"  # format_report: probe started but not finished within the budget
+# Q12 findability: wait at most FIND_WAIT_S for the searches, and never past the reply budget
+# minus FIND_MARGIN_S. Less than MIN_FIND_S left: start them (cache warms), don't wait.
+FIND_WAIT_S = 7.0
+FIND_MARGIN_S = 0.5
+MIN_FIND_S = 1.0
 
 
 class LookupClient(Protocol):
@@ -60,6 +65,8 @@ class Result:
     cached: bool = False
     live: str = ""  # Q2 live check: "" (not run) | pending | live | degraded | unreachable | ...
     card: Optional[dict] = None  # Q4: MetadataContent.metadata of an ASI:One card, audits only
+    find: str = ""  # Q12: "<checked>/<phrases>" when the findability test ran
+    find_top50: int = -1  # Q12: phrases where the agent was in the top 50
 
 
 async def handle(text: str, client: LookupClient, self_handles: Iterable[str] = (),
@@ -136,16 +143,24 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
 
     if lk.outcome in ("ok", "partial"):
         sc = score(lk)
-        live = None
-        if probe is not None and lk.address and sc.check("responsive").detail == UNRESPONSIVE_FLAG:
-            live = await _live_check(probe, lk.address, AUDIT_BUDGET_S - (time.monotonic() - started))
-        body = format_report(lk, sc, live=live, footer=footer)
+
+        async def live_check() -> Any:
+            if probe is not None and lk.address and sc.check("responsive").detail == UNRESPONSIVE_FLAG:
+                return await _live_check(probe, lk.address,
+                                         AUDIT_BUDGET_S - (time.monotonic() - started))
+            return None
+
+        live, find = await asyncio.gather(live_check(), _findability(client, lk, sc, started))
+        body = format_report(lk, sc, live=live, footer=footer, find=find)
         name = clean((lk.profile or {}).get("name")) or clean(target.label)
         top = sc.fixes[:TOP_FIXES]
         guides.LAST.put(chat_key, shown_for(lk, sc, name))
         live_status = live if isinstance(live, str) else str(getattr(live, "status", "") or "")
+        f_items = find.items if find is not None else ()
         return Result(body, lk.outcome, target.kind, n, target.from_url, lk.cached, live_status,
-                      _card(name, lk.address or "", sc, top))
+                      _card(name, lk.address or "", sc, top),
+                      f"{sum(st == 'ok' for _, st, _ in f_items)}/{len(f_items)}" if f_items else "",
+                      sum(st == "ok" and bool(rk) for _, st, rk in f_items) if f_items else -1)
     reply = {
         "not_found": router.not_found(target.label),
         "invalid": router.invalid(target.label),
@@ -154,6 +169,23 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
     }.get(lk.outcome, router.FALLBACK)
     outcome = lk.outcome if lk.outcome in ("not_found", "invalid", "api_down", "timeout") else "fallback"
     return err(reply, outcome)
+
+
+async def _findability(client: Any, lk: Lookup, sc: Any, started: float) -> Any:
+    """Q12: search rank for the agent's own starter prompts. None = not run. Never raises.
+    Off switch: FINDABILITY=0 in the VPS .env (read per reply, like AUDIT_CARDS)."""
+    try:
+        if os.getenv("FINDABILITY", "1").strip() == "0" or not sc.indexed or not lk.address:
+            return None
+        if not hasattr(client, "search_addresses"):
+            return None
+        items = findability.phrases(lk.profile)
+        if not items:
+            return None
+        wait = min(FIND_WAIT_S, started + REPLY_BUDGET_S - FIND_MARGIN_S - time.monotonic())
+        return await findability.check(client, lk.address, items, wait if wait >= MIN_FIND_S else 0)
+    except Exception:
+        return None
 
 
 def _card(name: str, address: str, sc: Any, top: Iterable[Any]) -> Optional[dict]:

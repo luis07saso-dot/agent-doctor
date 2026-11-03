@@ -31,6 +31,13 @@ ADDRESS_RE = re.compile(r"^agent1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{59}$")
 HANDLE_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 HANDLE_MAX = 64
 SEARCH_LIMIT = 50  # API max per page
+# Q12 findability searches (POST /v1/search/agents, keyword search = API default). Measured
+# 0.5-6.2 s with 90-500 KB bodies (2026-11-03), so their own timeout, cache and limit.
+SEARCH_TIMEOUT_S = 8.0
+SEARCH_CACHE_TTL_S = 300.0
+SEARCH_CACHE_MAX = 256
+SEARCH_CONCURRENCY = 6
+SEARCH_SOURCE = "agent-doctor-findability"  # labels our traffic (OpenAPI `source` field)
 
 Status = Literal["ok", "not_found", "timeout", "api_down"]
 Outcome = Literal["ok", "partial", "not_found", "timeout", "api_down", "invalid"]
@@ -97,6 +104,11 @@ class AgentverseClient:
         self._clock = clock
         self._cache: dict[str, tuple[float, Any]] = {}
         self._session = None  # aiohttp.ClientSession, created lazily inside the loop
+        # Q12: own cache (phrase -> addresses), not the lookup cache, so searches never push
+        # lookups out. In-flight searches are shared tasks.
+        self._search_cache: dict[str, tuple[float, tuple[str, ...]]] = {}
+        self._search_inflight: dict[str, asyncio.Task] = {}
+        self._search_sem: asyncio.Semaphore | None = None
 
     # ---------- public API ----------
 
@@ -147,6 +159,51 @@ class AgentverseClient:
         except asyncio.TimeoutError:
             return "timeout", None
         return status, address
+
+    async def search_addresses(self, phrase: str) -> tuple[str, tuple[str, ...]]:
+        """Q12: (status, result addresses lowercased, in rank order) for one keyword search,
+        top 50. status ok | timeout | api_down. Own 8 s timeout, not the caller's deadline:
+        callers only cap their wait, the search finishes and fills the cache. Never raises."""
+        key = re.sub(r"\s+", " ", (phrase or "").strip().lower())
+        try:
+            hit = self._search_cache.get(key)
+            if hit is not None:
+                if self._clock() < hit[0]:
+                    return "ok", hit[1]
+                self._search_cache.pop(key, None)
+            task = self._search_inflight.get(key)
+            if task is None:
+                task = asyncio.ensure_future(self._search(key, phrase.strip()))
+                self._search_inflight[key] = task
+
+                def _done(t: asyncio.Task, key: str = key) -> None:
+                    self._search_inflight.pop(key, None)
+                    if not t.cancelled():
+                        t.exception()  # retrieved: no "never retrieved" warning
+                task.add_done_callback(_done)
+            return await asyncio.shield(task)
+        except asyncio.CancelledError:
+            raise  # the awaiter was cancelled; the shared task keeps running
+        except Exception:
+            return "api_down", ()
+
+    async def _search(self, key: str, phrase: str) -> tuple[str, tuple[str, ...]]:
+        if self._search_sem is None:
+            self._search_sem = asyncio.Semaphore(SEARCH_CONCURRENCY)
+        timeout = SEARCH_TIMEOUT_S
+        async with self._search_sem:
+            src = await self._call(
+                "POST", f"{BASE_URL}/search/agents",
+                {"search_text": phrase, "limit": SEARCH_LIMIT, "offset": 0, "source": SEARCH_SOURCE},
+                float("inf"), timeout=timeout)  # own timeout only, no shared deadline
+        if src.status != "ok":
+            return ("timeout" if src.status == "timeout" else "api_down"), ()
+        addrs = tuple(str(a.get("address") or "").lower()
+                      for a in (src.data or {}).get("agents") or [] if isinstance(a, dict))
+        if len(self._search_cache) >= SEARCH_CACHE_MAX:
+            self._search_cache.pop(next(iter(self._search_cache)))
+        self._search_cache[key] = (self._clock() + SEARCH_CACHE_TTL_S, addrs)
+        return "ok", addrs
 
     async def aclose(self) -> None:
         if self._session is not None:
@@ -227,8 +284,10 @@ class AgentverseClient:
     async def _post(self, url: str, body: dict, deadline: float) -> Source:
         return await self._call("POST", url, body, deadline)
 
-    async def _call(self, method: str, url: str, body: dict | None, deadline: float) -> Source:
-        timeout = min(self._call_timeout, deadline - self._clock())
+    async def _call(self, method: str, url: str, body: dict | None, deadline: float,
+                    timeout: float | None = None) -> Source:
+        timeout = min(self._call_timeout if timeout is None else timeout,
+                      deadline - self._clock())
         if timeout <= 0:
             return Source("timeout")
         try:
