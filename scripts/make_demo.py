@@ -3,7 +3,7 @@
 Usage (sandbox off: chrome-headless-shell needs mach ports):
     python3 scripts/make_demo.py            # -> media/demo-v1.mp4 (1080x1080)
 
-Inputs: media/raw/{A-audit,B-fix1,C-prehire}.mov (+ optional D-profile.mov).
+Inputs: media/raw/{A-audit,B-fix1,C-prehire}.mov (+ optional D-profile.mov, the Agentverse profile).
 All chat footage is real and unedited apart from crop, cut, freeze-frame and
 labelled speed-ups. Cards are text only.
 """
@@ -35,6 +35,7 @@ CROP_PROFILE_BOTTOM = (400, 311, 1620, 1365)
 CROP_CHAT = (420, 150, 1580, 1331)
 CROP_COMPOSER = (420, 345, 1580, 1331)
 CROP_PREHIRE = (420, 330, 1580, 1331)
+CROP_PROFILE_D = (100, 623, 1250, 1053)  # left column only: header + README (skips owner-only side panel)
 
 
 def run(cmd: list[str]) -> None:
@@ -141,6 +142,8 @@ def main() -> None:
         "b2": (f"<span {g}>Step-by-step</span> + a copy-paste example", ""),
         "c1": ("Hiring an agent? Check it first", "Doctor sends it one test message. Waiting sped up 4×"),
         "c2": (f"Flagged “unresponsive”. Actually <span {g}>LIVE</span>", "Answered Doctor's test message in 5.0 s"),
+        "d1": (f"Listed on Agentverse: <span {g}>Active</span>, ASI:One-ready", "Agent Doctor's profile"),
+        "d2": ("A full README: what search reads first", "Summary · Key features · Usage · Use cases · Limitations"),
     }.items()}
 
     parts = [
@@ -156,10 +159,14 @@ def main() -> None:
         clip(c, 3.3, 13.0, CROP_PREHIRE, cap["c1"], tmp / "09.mp4", speed=4.0),
         freeze(c, 16.0, 6.5, CROP_PREHIRE, cap["c2"], tmp / "10.mp4"),
     ]
+    parts.append(still(r11, 3.5, tmp / "11.mp4"))
     d = RAW / "D-profile.mov"
     if d.is_file():
-        print("note: D-profile.mov present but not wired in yet")
-    parts += [still(r11, 3.5, tmp / "11.mp4"), still(end, 4.5, tmp / "12.mp4")]
+        parts += [
+            freeze(d, 1.0, 3.0, CROP_PROFILE_D, cap["d1"], tmp / "11a.mp4"),
+            clip(d, 9.5, 13.5, CROP_PROFILE_D, cap["d2"], tmp / "11b.mp4"),
+        ]
+    parts.append(still(end, 4.5, tmp / "12.mp4"))
 
     lst = tmp / "list.txt"
     lst.write_text("".join(f"file '{p}'\n" for p in parts))
