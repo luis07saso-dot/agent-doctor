@@ -192,12 +192,13 @@ your message
 - **Data used**: public Agentverse endpoints only (agent search, agent profile, Almanac registration and handles). No private data, no logins.
 - **Privacy**: logs keep no message text, and sender IDs are hashed. To power fix guides, `why this score?` and the re-check diff, Agent Doctor stores the last audit shown in a chat (24 hours) and the last score and pass/fail of each check per agent you checked (30 days, up to 20 agents). Keys are hashed; only public agent data (name, address, score, check results) is kept. Send `forget` to delete it.
 - **Reliability**: an error gets a short "try again" reply, never silence or a crash. Rate limits and a loop guard stop runaway agent-to-agent loops (a conversation that keeps flooding is paused for 24 hours). Runs 24/7 on a dedicated server with a watchdog and one-step rollback.
-- **Tested**: 782 automated tests, plus live checks on ASI:One.
+- **Tested**: 795 automated tests, plus live checks on ASI:One.
 
 ## Use cases
 
 - **Builders before launch**: run an agent audit before sharing your agent, fix the gaps, re-check.
 - **Agents with no traffic**: wondering "why is my agent not getting interactions?" Send its address or handle to see why it gets no impressions or picks, and improve agent discoverability.
+- **Agent not responding?** Ask `is my-weather-bot live?` (or just "my-weather-bot not responding"). One test message tells you LIVE, DEGRADED or UNREACHABLE, so you know whether to fix it or hire another agent.
 - **Hackathon teams**: check the profile meets the Agentverse ranking basics before judging.
 - **Agencies and teams with many agents**: get a quick, consistent score for each one.
 - **After every profile edit**: re-check to confirm the change landed (Agentverse can take a few minutes to update).
@@ -228,6 +229,6 @@ your message
 - **Data sources**: public Agentverse search and Almanac APIs
 - **Privacy**: logs keep no message text; sender IDs are hashed; `forget` deletes stored audits
 - **Price**: free
-- **Version**: 0.10.0
+- **Version**: 0.10.1
 - **Maintainer**: [leedr.tech](https://leedr.tech)
 - **Built for**: Stranger Builds hackathon, Fetch.ai track

@@ -327,6 +327,10 @@ def say(text, session="u1"):
     "pre-hire check weather-bot",
     "is weather-bot live?",
     "ping @weather-bot",
+    f"{STRONG} not responding",
+    "weather-bot not responding",
+    "my agent weather-bot stopped answering",
+    "@weather-bot doesn't respond",
 ])
 def test_chat_prehire_routes_to_probe(chat_wired, text):
     (reply,), (req,) = say(text)
@@ -338,6 +342,27 @@ def test_chat_prehire_routes_to_probe(chat_wired, text):
 def test_chat_prehire_overturns_stale_unresponsive_flag(chat_wired):
     (reply,), _ = say(f"is {STRONG} live?")
     assert "unresponsive" in reply and "out of date" in reply
+
+
+@pytest.mark.parametrize("text", [
+    "agent not responding",
+    "my agent not responding",
+    "my agent is not replying",
+    "my agent stopped responding",
+    "agent doesn't respond on ASI:One",
+    "why does my agent not answer?",
+])
+def test_not_responding_wording_asks_for_target(text):
+    assert router.classify(text).kind == "prehire_need_target"
+
+
+@pytest.mark.parametrize("text", [
+    "why is my agent not getting picks",
+    "my agent is not ranking",
+    "fix my car, it is not responding",
+])
+def test_not_responding_wording_needs_agent_and_reply_verb(text):
+    assert router.classify(text).kind != "prehire_need_target"
 
 
 def test_chat_prehire_without_target(chat_wired):

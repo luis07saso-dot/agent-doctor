@@ -207,7 +207,9 @@ _LIVE_Q = re.compile(
     r"\b(?:live|alive|online|reachable|responsive|responding|answering|working|"
     # "is it up?" is liveness; "showing up", "come up" (search visibility) are not.
     r"(?<!show )(?<!shows )(?<!showing )(?<!come )(?<!comes )(?<!coming )(?<!pop )(?<!pops )"
-    r"(?<!popping )(?<!turn )(?<!turns )(?<!turning )(?<!end )up(?=\s*[?.!]*\s*$))\b",
+    r"(?<!popping )(?<!turn )(?<!turns )(?<!turning )(?<!end )up(?=\s*[?.!]*\s*$))\b"
+    # "agent not responding", "doesn't answer", "stopped replying" (keyword: agent not responding).
+    r"|(?:\bnot|n't|\bnever|\bno longer|\bstopped|\bstops)\s+(?:respond|answer|repl)\w*",
     re.IGNORECASE | re.DOTALL)
 # Q5 follow-ups: the n-th top fix of the last audit in this chat.
 # Strong form (always): the word "fix" right before the number, the number ending the phrase

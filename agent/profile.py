@@ -35,7 +35,7 @@ KEYWORDS: tuple[str, ...] = (
     "agentverse seo",
     "agent discoverability",
     "agent readme review",
-    "asi:one search visibility",
+    "agent not responding",
     "agent profile score",
     "audit my agent",
     "agentverse optimization",
