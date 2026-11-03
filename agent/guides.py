@@ -62,7 +62,14 @@ def short_how(check: Check) -> str:
                 "and limits.")
     if rule == "responsive" and check.detail != UNRESPONSIVE_FLAG:
         return SHORT["active"]
+    if rule == "success_rate" and check.kind == "no_data":
+        return SHORT_NO_DATA_SUCCESS
     return SHORT.get(rule, "")
+
+
+# Q10: no success rate yet is no data, not a low rate: the advice is about getting chats.
+SHORT_NO_DATA_SUCCESS = ("How: share it with real users on ASI:One (badge, posts); answer "
+                         "in-scope questions fully.")
 
 
 SHORT: dict[str, str] = {
@@ -123,6 +130,17 @@ Input: `summarise <link>` → Output: 5 bullets
 ```"""
 
 _NO_FAKE = "Don't script fake chats: Fetch.ai's terms ban falsifying ratings."
+
+# Q10 (FB-2): Agentverse shows no success rate yet. That is no data, not 0%.
+_SUCCESS_NO_DATA: tuple[str, list[str], str] = (
+    "Agentverse has no success rate for this agent yet: no data, not 0%. The docs describe it "
+    "as a rolling 30-day score over ASI:One conversations (other agents' chats count too).",
+    ["Get real people to chat with it through ASI:One: share the agent page, posts, a badge.",
+     "Make the README say exactly what it can and can't do: chats are judged against it.",
+     "Answer in-scope questions fully; decline off-scope ones in one polite line.",
+     "Check the Growth tab after a few days.",
+     _NO_FAKE],
+    "")
 
 _GUIDES: dict[str, tuple[str, list[str], str]] = {  # rule -> (why, steps, example)
     "active": (
@@ -248,6 +266,8 @@ def full_guide(n: int, check: Check, name: str = "") -> str:
         why, steps, example = _sections_guide(check)
     elif check.rule == "responsive" and check.detail != UNRESPONSIVE_FLAG:
         why, steps, example = _GUIDES["active"]
+    elif check.rule == "success_rate" and check.kind == "no_data":
+        why, steps, example = _SUCCESS_NO_DATA
     else:
         why, steps, example = _GUIDES[check.rule]
         if check.rule == "readme" and not _readme_missing(check):
@@ -269,6 +289,15 @@ class Shown:
     name: str
     address: str
     fixes: tuple[Check, ...]
+    # Q10 "why this score?": the whole audit, so a follow-up question is answered from it.
+    total: int = 0
+    verdict: str = ""
+    rows: tuple = ()  # evidence.Row per check
+    facts: tuple = ()  # (field, value) pairs from evidence.facts
+
+    @property
+    def facts_dict(self) -> dict:
+        return dict(self.facts)
 
 
 class LastAudit:

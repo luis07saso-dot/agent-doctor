@@ -21,7 +21,8 @@ HELP = (
     "handle, avatar, status, rating, Testing and more), each with how to do it. "
     "Then ask `how do I fix #1` for step-by-step help. Free.\n\n"
     "Before you rely on an agent, ask `is weather-bot live?` or `pre-hire check agent1q...`: "
-    "I send it one test message and tell you if it really answers."
+    "I send it one test message and tell you if it really answers.\n\n"
+    "Ask `why this score?` to see the data behind each check."
 )
 
 OFF_SCOPE = (
@@ -152,6 +153,12 @@ def faq_key(text: str) -> str:
     """Which FAQ a message asks, or "" if none."""
     return next((k for k, rx in _FAQ_PATTERNS if rx.search(text)), "")
 
+EXPLAIN_NONE = (
+    "I don't have an audit in this chat yet, so there's no score to explain. "
+    "Send an agent address or handle first (e.g. `audit weather-bot`, no @), "
+    "then ask `why this score?`."
+)
+
 NO_AUDIT_YET = (
     "I don't have an audit in this chat yet, so I don't know which fix you mean. "
     "Send an agent address or handle first (e.g. `audit weather-bot`, no @), "
@@ -241,7 +248,34 @@ _GREETING = re.compile(r"^\W*(hi|hello|hey|help|start|menu|commands?|usage|what 
                        re.IGNORECASE)
 
 Kind = Literal["audit", "prehire", "help", "need_target", "prehire_need_target", "bad_address",
-               "off_scope", "fix_guide", "faq"]
+               "off_scope", "fix_guide", "faq", "explain", "explain_none"]
+
+# Q10 (FB-2): questions about an audit ("why this score?", "how many unique users does X have?")
+# get the evidence, not a re-run of the audit. Narrow on purpose: "why isn't X ranking?" and
+# "is X open-source?" stay audits (spec docs/specs/q10-why-this-score.md §3.6 table).
+_EXPLAIN = re.compile("|".join((
+    r"\bwhy\b.{0,40}\b(?:scor\w*|rated|rating|points?|recommend\w*|suggest\w*|tips?|found|"
+    r"so low|so high)\b",
+    r"\b(?:this|that|my|the|its|their) score\b.{0,20}\?|\bthis score\b",
+    r"\bevidence\b",
+    r"\bexplain\b.{0,30}\b(?:score|scoring|rating|points|audit|result|this|that)\b",
+    r"\bbreak\s?down\b",
+    r"\bunique users?\b|\bhow many (?:unique )?(?:users|people|chats|conversations|interactions)\b",
+    r"\bsuccess (?:rate|metrics?)\b",
+    r"\bwhat(?:'s|s| is| was| are)\b.{0,30}\b(?:rating|success|interactions)\b",
+    r"\bhow\b.{0,30}\b(?:you|it|this|that|they)\b.{0,20}\b(?:scor\w*|calculat\w*|rated|rating|"
+    r"measur\w*|got)\b",
+    r"\bwhere\b.{0,30}\b(?:data|numbers?)\b.{0,20}\bcome\b",
+)), re.IGNORECASE | re.DOTALL)
+_AUDIT_CMD = re.compile(r"\baudit\w*|\bre-?check\w*|\bscan\b", re.IGNORECASE)
+_STRONG_EXPLAIN = re.compile(r"\bthis score\b|\bwhy\b.{0,40}\bscor\w*|\bunique users?\b",
+                             re.IGNORECASE | re.DOTALL)
+
+
+def explain_wanted(text: str) -> bool:
+    return bool(_EXPLAIN.search(text) and not _AUDIT_CMD.search(text)
+                and not (_PREHIRE.search(text) or _LIVE_Q.search(text))
+                and fix_number(text, True) == 0)
 
 
 @dataclass(frozen=True)
@@ -264,7 +298,9 @@ def classify(text: str, self_handles: Iterable[str] = (),
     ex = extract(text, ignore_handles=self_handles, ignore_addresses=self_addresses)
     wants_prehire = bool(_PREHIRE.search(text) or _LIVE_Q.search(text))
     if ex.targets:
-        return Intent("prehire" if wants_prehire else "audit", ex.targets)
+        if wants_prehire:
+            return Intent("prehire", ex.targets)
+        return Intent("explain" if explain_wanted(text) else "audit", ex.targets)
     if ex.bad_address:
         return Intent("bad_address")
     for h in self_handles:  # "@agent-doctor hi" from ASI:One: judge the rest of the text
@@ -276,8 +312,16 @@ def classify(text: str, self_handles: Iterable[str] = (),
     n = fix_number(text, has_audit)
     if n:
         return Intent("fix_guide", n=n)
+    explain = explain_wanted(text)
+    key = faq_key(text)
     base = _no_target(text)
     soft = soft_handles(text, self_handles)
+    if soft and explain:  # "how many users does weather-bot have?": about that agent
+        return Intent("explain", (Target("handle", soft[0]),), soft=True,
+                      fallback=Intent("explain") if has_audit else base)
+    if has_audit and key in ("", "score") and (explain or key == "score") and not wants_prehire \
+            and not _AUDIT_CMD.search(text):
+        return Intent("explain")  # about the last audit in this chat
     if soft:
         kind = "prehire" if wants_prehire else "audit"
         target = (Target("handle", soft[0]),)
@@ -285,6 +329,8 @@ def classify(text: str, self_handles: Iterable[str] = (),
             return Intent(kind, target)
         if base.kind != "off_scope":  # elsewhere: a guess, only in a message about agents
             return Intent(kind, target, soft=True, fallback=base)
+    if base.kind in ("need_target", "help", "off_scope") and _STRONG_EXPLAIN.search(text):
+        return Intent("explain_none")
     return base
 
 
@@ -311,6 +357,7 @@ def reply_for(kind: Kind) -> str:
         "prehire_need_target": PREHIRE_NEED_TARGET,
         "bad_address": BAD_ADDRESS,
         "off_scope": OFF_SCOPE,
+        "explain_none": EXPLAIN_NONE,
     }[kind]
 
 

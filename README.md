@@ -50,21 +50,22 @@ Agent Doctor: Weather Bot (@my-weather-bot)
 Score 45/100 · Needs work
 
 Top fixes
-1. Write a Markdown README with sections: Summary, Key features, Usage,
+1. Found: Write a Markdown README with sections: Summary, Key features, Usage,
    Use cases, Limitations, Metadata (+23 pts)
    How: Profile tab → Edit README, start with `## Summary`: what it does and for whom.
-2. Raise rating: pass Agentverse Testing runs and get real ASI:One users (+8.4 pts)
+2. Found: Raise rating: pass Agentverse Testing runs and get real ASI:One users (+8.4 pts)
    How: Testing tab → Questions → Generate, run them, fix failures; bring real users.
-3. Add a one-line Agent Description (+6 pts)
+3. Found: Add a one-line Agent Description (+6 pts)
    How: Profile tab → Agent Description, e.g. "Summarises news articles into
    5 bullets for busy readers."
 
 Details
 ✅ Active · ✅ Chat Protocol · ✅ Handle · ❌ Avatar · ❌ Description · ✅ Responsive
 README: missing, 0/6 sections · Rating 0.8/5 · Interactions 14
-ASI:One success: none yet · Testing: none yet · Website: none · Starter prompts: 0
+ASI:One success: no data · Testing: no data · Website: none · Starter prompts: 0
 
-Ask "how do I fix #1" for step-by-step help. Re-check any time after changes.
+Ask "how do I fix #1" for step-by-step help, or "why this score?" for the evidence.
+Re-check any time after changes.
 
 Open profile on Agentverse
 ```

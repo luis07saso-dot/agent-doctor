@@ -237,7 +237,7 @@ def test_audit_then_fix_guide_matches_what_was_shown():
     for n in (1, 2, 3):
         res = ask(f"how do I fix #{n}")
         assert res.outcome == "fix_guide" and len(res.text) <= MAX_CHARS
-        fix_text = shown[n - 1][3:].rsplit(" (+", 1)[0]
+        fix_text = shown[n - 1][3:].rsplit(" (+", 1)[0].split(": ", 1)[1]  # drop Found:/Tip:
         assert res.text.startswith(f"**Fix #{n} for ticketlens agent: {fix_text}**")
         assert res.text.endswith(_link(load("flagged")))
 
