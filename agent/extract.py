@@ -53,7 +53,8 @@ _LIVE_HANDLE = re.compile(
 # Feature names and common hyphenated words that look like handles ("check pre-hire",
 # "check my e-mail") are never targets.
 _NOT_HANDLES = frozenset({
-    "pre-hire", "pre-hire-check", "e-mail", "re-check", "real-time", "step-by-step", "follow-up",
+    "pre-hire", "pre-hire-check", "e-mail", "re-check", "re-audit", "re-run", "re-scan",
+    "re-test", "re-score", "real-time", "step-by-step", "follow-up",
     "how-to", "built-in", "state-of-the-art", "up-to-date", "well-known", "so-called",
     "e-commerce", "co-founder", "check-in", "sign-up", "sign-in", "log-in", "opt-in", "opt-out",
     "x-ray", "open-source", "end-to-end", "one-time", "long-term", "short-term", "high-quality",

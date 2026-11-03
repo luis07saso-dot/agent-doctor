@@ -80,7 +80,7 @@ def test_link_survives_even_when_body_must_be_cut():
 def test_no_address_no_link_but_still_valid():
     lk = dataclasses.replace(load("weak"), address=None)
     out = format_report(lk, score(lk))
-    assert "Open profile" not in out and "Re-check any time" in out
+    assert "Open profile" not in out and "re-check\" any time" in out
 
 
 # ---------- Q5: how-to under each fix ----------

@@ -83,6 +83,16 @@ class Memory:
             return None
         return item[2]
 
+    def latest_for_sender(self, sender_key: str) -> Any:
+        """Q17: the newest unexpired audit shown to `sender_key` in any chat, or None."""
+        if not sender_key:
+            return None
+        now = self.clock()
+        for at, s, shown in reversed(list(self._chats.values())):  # newest put last
+            if s == sender_key and now - at <= self.chat_ttl:
+                return shown
+        return None
+
     def _prune_chats(self) -> None:
         now = self.clock()
         for k in [k for k, (at, _, _) in self._chats.items() if now - at > self.chat_ttl]:

@@ -118,7 +118,7 @@ def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "",
         details.append("_Tip = no data from Agentverse, general advice._")
     tail = ["", ("Ask \"how do I fix #1\" for step-by-step help, or \"why this score?\" for the "
                  "evidence. " if fixes else "Ask \"why this score?\" for the evidence. ")
-            + "Re-check any time after changes."]
+            + "Say \"re-check\" any time after changes."]
     if lookup.address:
         tail += ["", f"[Open profile on Agentverse]({PROFILE_URL.format(address=lookup.address)})"]
     tail_text = "\n" + "\n".join(tail) + footer

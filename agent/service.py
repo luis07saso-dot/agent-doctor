@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Awaitable, Callable, Iterable, Optional, Protocol
 
 from agent import cards, evidence, findability, guides, recheck, router
@@ -90,6 +90,14 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
     started = time.monotonic()
     has_audit = guides.LAST.get(chat_key) is not None
     intent = router.classify(text, self_handles, self_addresses, has_audit)
+    via_last = bool(intent.last)
+    if via_last:  # Q17: "re-check the same agent" -> the remembered agent's address
+        shown = _remembered(chat_key, sender_key, intent.last == "any")
+        if shown is None:
+            text_, outcome = router.reply(intent.fallback or router.Intent("recheck_none"))
+            return Result(text_, outcome, "none")
+        intent = replace(intent, targets=(Target("address", shown.address),), last="",
+                         fallback=None)
     if intent.kind == "fix_guide":
         return _fix_guide(intent.n, chat_key)
     if intent.kind == "forget":
@@ -113,11 +121,12 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         return Result(text_, outcome, "soft_miss")
 
     target: Target = intent.targets[0]
+    itype = "last" if via_last else target.kind  # log input type
     n = len(intent.targets)
     footer = router.more_targets(n - 1) if n > 1 else ""
 
     def err(text: str, outcome: str) -> Result:
-        return Result(text + footer, outcome, target.kind, n, target.from_url)
+        return Result(text + footer, outcome, itype, n, target.from_url)
 
     if intent.kind == "prehire" and prehire is not None:
         try:
@@ -126,7 +135,7 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
             return soft_miss() if intent.soft else err(router.TIMEOUT, "prehire_error")
         if intent.soft and status in ("not_found", "invalid", "error"):
             return soft_miss()
-        return Result(fit(body, footer), f"prehire_{status}", target.kind, n, target.from_url)
+        return Result(fit(body, footer), f"prehire_{status}", itype, n, target.from_url)
 
     try:
         lk = await asyncio.wait_for(_lookup(client, target), HARD_TIMEOUT_S)
@@ -146,7 +155,7 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         name = clean((lk.profile or {}).get("name")) or clean(target.label)
         shown = shown_for(lk, sc, name)
         guides.LAST.put(chat_key, shown, sender_key)
-        return Result(evidence.format_explain(shown, text), "explain", target.kind, n,
+        return Result(evidence.format_explain(shown, text), "explain", itype, n,
                       target.from_url, lk.cached)
 
     if lk.outcome in ("ok", "partial"):
@@ -166,7 +175,7 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         guides.LAST.put(chat_key, shown_for(lk, sc, name), sender_key)
         live_status = live if isinstance(live, str) else str(getattr(live, "status", "") or "")
         f_items = find.items if find is not None else ()
-        return Result(body, lk.outcome, target.kind, n, target.from_url, lk.cached, live_status,
+        return Result(body, lk.outcome, itype, n, target.from_url, lk.cached, live_status,
                       _card(name, lk.address or "", sc, top),
                       f"{sum(st == 'ok' for _, st, _ in f_items)}/{len(f_items)}" if f_items else "",
                       sum(st == "ok" and bool(rk) for _, st, rk in f_items) if f_items else -1)
@@ -185,6 +194,16 @@ def diff_key(sender_key: str, chat_key: str) -> str:
     DIFF_KEY=chat in the VPS .env switches to per chat, e.g. if ASI:One turns out to relay
     many people under one sender (unverified). Read per reply."""
     return chat_key if os.getenv("DIFF_KEY", "").strip().lower() == "chat" else sender_key
+
+
+def _remembered(chat_key: str, sender_key: str, any_chat: bool) -> Optional[guides.Shown]:
+    """Q17: the agent "re-check the same agent" means: this chat's last audit, else (strong
+    wording only) this sender's latest audit in any chat. Not across chats when DIFF_KEY=chat
+    (ASI:One may relay many people under one sender: unverified, spec q15 F9)."""
+    shown = guides.LAST.get(chat_key)
+    if shown is None and any_chat and diff_key(sender_key, chat_key) == sender_key:
+        shown = guides.LAST.memory.latest_for_sender(sender_key)
+    return shown if shown is not None and shown.address else None
 
 
 def _recheck(lk: Lookup, sc: Any, key: str) -> Any:

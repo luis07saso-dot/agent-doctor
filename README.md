@@ -22,7 +22,7 @@ It is built for agent builders asking "why is nobody finding my agent?". Think o
 - **Pre-Hire Check (live test)**: ask `is my-weather-bot live?` and Agent Doctor sends that agent one test message, times its acknowledgement and answer, and adds its rating and profile score. Other agents can call it too (see "For agents").
 - **Why this score?**: after an audit, ask `why this score?` to see the data behind each check. A check Agentverse has no data for shows "no data" (0 points), not a failure.
 - **Findability test**: searches Agentverse for up to 3 of the agent's own starter prompts and shows where it ranks in the top 50, so you see whether users typing those words can find it.
-- **Re-check diff**: audit the same agent again and see the score change since the last check, with what was fixed and what is new.
+- **Re-check diff**: say `re-check` (or `check it again`) and Agent Doctor audits the last agent again, no need to paste its address. You see the score change since the last check, with what was fixed and what is new.
 - **`forget`**: send `forget` to delete everything Agent Doctor stored for you.
 
 ## Usage
@@ -69,7 +69,7 @@ README: missing, 0/6 sections · Rating 0.8/5 · Interactions 14
 ASI:One success: no data · Testing: no data · Website: none · Starter prompts: 0
 
 Ask "how do I fix #1" for step-by-step help, or "why this score?" for the evidence.
-Re-check any time after changes.
+Say "re-check" any time after changes.
 
 Open profile on Agentverse
 ```
@@ -209,6 +209,7 @@ your message
 - **Pre-Hire Check tests availability, not answer quality.** LIVE means the agent answered within 14 seconds; it does not judge the answer. An agent that acknowledges but answers after 14s shows as DEGRADED; one that does not even acknowledge shows as UNREACHABLE.
 - **Fix guides follow the last audit in the same chat.** `how do I fix #2` and `why this score?` need an audit earlier in that chat; it is kept for 24 hours, also across restarts. Guides follow the Agentverse docs; the Agentverse UI may change.
 - **Findability is information, not score.** It uses Agentverse search; ASI:One may rank agents differently. Agents without usable starter prompts get no findability line. A search that is slow shows "not checked": re-check a minute later.
+- **`re-check` remembers the last agent for 24 hours.** It uses the last audit in the same chat; `re-check`, `same agent` or `again` also reach your latest audit from an earlier chat. To check a different agent, send its address or handle.
 - **Re-check diff needs an earlier check.** It compares with your last complete check of the same agent in the past 30 days.
 - **Weights are our estimate.** Agentverse does not publish its ranking weights. The rubric follows the official docs' emphasis; the same input always gives the same score.
 - **Keywords are not checked yet.** Make sure each keyword appears in your README.
@@ -229,6 +230,6 @@ your message
 - **Data sources**: public Agentverse search and Almanac APIs
 - **Privacy**: logs keep no message text; sender IDs are hashed; `forget` deletes stored audits
 - **Price**: free
-- **Version**: 0.10.1
+- **Version**: 0.10.2
 - **Maintainer**: [leedr.tech](https://leedr.tech)
 - **Built for**: Stranger Builds hackathon, Fetch.ai track

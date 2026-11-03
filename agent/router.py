@@ -19,7 +19,8 @@ HELP = (
     "your message to that agent instead.\n\n"
     "You get a 0-100 score, a verdict and the top 3 fixes (README, Chat Protocol, "
     "handle, avatar, status, rating, Testing and more), each with how to do it. "
-    "Then ask `how do I fix #1` for step-by-step help. Free.\n\n"
+    "Then ask `how do I fix #1` for step-by-step help, or send `re-check` after changes "
+    "(no need to paste the address again). Free.\n\n"
     "Before you rely on an agent, ask `is weather-bot live?` or `pre-hire check agent1q...`: "
     "I send it one test message and tell you if it really answers.\n\n"
     "Ask `why this score?` to see the data behind each check. "
@@ -171,7 +172,8 @@ NO_AUDIT_YET = (
 
 def no_such_fix(n: int, count: int, name: str) -> str:
     if count == 0:
-        return f"The last audit of {name} found nothing to fix. Re-check any time after changes."
+        return (f"The last audit of {name} found nothing to fix. "
+                "Say \"re-check\" any time after changes.")
     pick = "#1" if count == 1 else f"#1 to #{count}"
     return f"The last audit of {name} listed {count} fix{'es' if count > 1 else ''}, so there is no #{n}. Ask for {pick}."
 
@@ -253,7 +255,8 @@ _GREETING = re.compile(r"^\W*(hi|hello|hey|help|start|menu|commands?|usage|what 
                        re.IGNORECASE)
 
 Kind = Literal["audit", "prehire", "help", "need_target", "prehire_need_target", "bad_address",
-               "off_scope", "fix_guide", "faq", "explain", "explain_none", "forget"]
+               "off_scope", "fix_guide", "faq", "explain", "explain_none", "forget",
+               "recheck_none"]
 
 # Q15: "forget me" / "delete my data". A verb needs a data noun ("delete this" is not enough),
 # except "forget" on its own. Whole message only, so "forget it, audit X" is not one.
@@ -308,6 +311,62 @@ def explain_wanted(text: str) -> bool:
                 and fix_number(text, True) == 0)
 
 
+RECHECK_NONE = (
+    "I don't have a recent audit to re-check, so I don't know which agent you mean "
+    "(I keep the last one for 24 hours; `forget` deletes it).\n\n" + _NEXT
+)
+
+# Q17: back-references to the last audited agent, in a message with no target. Strong ("re-check
+# the same agent", "check it again"): clearly an earlier agent, so it may come from an earlier
+# chat of this sender. Weak ("audit it", "is that agent live?"): only this chat's last audit.
+_BACK_STRONG = re.compile(
+    r"\bre-?(?:check|audit|scan|run|test|score)(?:s|ed|ing)?\b"
+    r"|\bsame\s+(?:agent|one|bot|address|handle)\b"
+    r"|\bre-?do\s+(?:the\s+|that\s+)?(?:audit|check|scan|it)\b"
+    r"|\b(?:last|previous|prior|earlier)\s+(?:agent|one|bot)\b", re.IGNORECASE)
+_AGAIN = re.compile(r"\bagain\b|\bone more time\b|\bonce more\b", re.IGNORECASE)
+_BACK_WEAK = re.compile(r"\bit\b|\b(?:that|this|the)\s+(?:agent|one|bot)\b", re.IGNORECASE)
+# Narrow on purpose: "how do I fix it / test it / do it" are questions, not re-checks.
+_RECHECK_VERB = re.compile(r"\b(?:audit|check|scan|score|analy[sz]e)\w*", re.IGNORECASE)
+# Weak cue: the verb must act on the reference ("check it", "audit that agent").
+_VERB_ON_REF = re.compile(r"\b(?:audit|check|scan|score|analy[sz]e)\s+(?:it|(?:that|this|the)\s+"
+                          r"(?:agent|one|bot))\b", re.IGNORECASE)
+# Never a re-check request: questions about Doctor ("how do I re-check?", "what is a pre-hire
+# check again"), deleting data, explaining, refusals, "check it out", "I'll check it later".
+_NOT_RECHECK = re.compile(
+    r"^\W*(?:(?:ok|okay|so|hey|hi|thanks?|thank you)\W+)*"
+    r"(?:how|what|whats|when|why|where|which|who|does|did|do i|can i|could i|should i|"
+    r"is there|are there)\b"
+    r"|\b(?:delete|forget|erase|wipe|remove|clear|explain|don't|dont|do not|no need|never ?mind|"
+    r"stop|i'll|i will|i'm going to|im going to|let me|later)\b"
+    r"|\b(?:it|this|that) out\b", re.IGNORECASE)
+_RE_VERB = re.compile(r"\bre-?(?:check|audit|scan|run|test|score|do)\w*", re.IGNORECASE)
+# Guards apply per clause: "remove the bad keyword and re-check" is still a re-check.
+_CLAUSE = re.compile(r"[,.;:!?]+|\s(?:and|then|but|just|so|now)\s", re.IGNORECASE)
+
+
+def back_ref(text: str, wants_prehire: bool, has_audit: bool) -> str:
+    """"any" (strong), "chat" (weak, needs an audit in this chat) or "" (not a back-reference)."""
+    found = ""
+    asked = False  # an earlier clause was a question: "what is X, again?", "what's Y? and Z"
+    for part in _CLAUSE.split(f" {text} "):
+        part = part.strip()
+        if not part:
+            continue
+        if _NOT_RECHECK.search(part):
+            asked = True
+            continue
+        if asked and not (_RECHECK_VERB.search(part) or _RE_VERB.search(part)):
+            continue  # after a question, only an explicit "re-check X" / "check it" counts
+        weak = _BACK_WEAK.search(part)
+        if _BACK_STRONG.search(part) or (_AGAIN.search(part) and (
+                _RECHECK_VERB.search(part) or _AGENT_WORD.search(part) or weak)):
+            return "any"
+        if has_audit and (_VERB_ON_REF.search(part) or (weak and wants_prehire)):
+            found = "chat"
+    return found
+
+
 @dataclass(frozen=True)
 class Intent:
     kind: Kind
@@ -318,6 +377,9 @@ class Intent:
     # service answers with `fallback` (what the message means without the guess) instead.
     soft: bool = False
     fallback: Optional["Intent"] = None
+    # Q17: target = the last audited agent ("any": this chat, else this sender's latest;
+    # "chat": this chat only). None remembered -> `fallback`.
+    last: str = ""
 
 
 def classify(text: str, self_handles: Iterable[str] = (),
@@ -354,6 +416,10 @@ def classify(text: str, self_handles: Iterable[str] = (),
     if has_audit and key in ("", "score") and (explain or key == "score") and not wants_prehire \
             and not _AUDIT_CMD.search(text):
         return Intent("explain")  # about the last audit in this chat
+    ref = "" if soft else back_ref(text, wants_prehire, has_audit)
+    if ref and not key:  # Q17: "re-check the same agent", "is it live?". FAQs win.
+        return Intent("prehire" if wants_prehire else "audit", last=ref,
+                      fallback=Intent("recheck_none") if ref == "any" else base)
     if soft:
         kind = "prehire" if wants_prehire else "audit"
         target = (Target("handle", soft[0]),)
@@ -390,6 +456,7 @@ def reply_for(kind: Kind) -> str:
         "bad_address": BAD_ADDRESS,
         "off_scope": OFF_SCOPE,
         "explain_none": EXPLAIN_NONE,
+        "recheck_none": RECHECK_NONE,
     }[kind]
 
 
