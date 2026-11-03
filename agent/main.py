@@ -28,6 +28,7 @@ def build(settings: config.Settings, publish_manifests: bool = True, **overrides
     )
     kwargs.update(overrides)
     agent = Agent(**kwargs)
+    _publish_starter_prompts(agent)
     agent.include(chat_proto, publish_manifest=publish_manifests)
     agent.include(prehire_proto, publish_manifest=publish_manifests)
     chat.configure(settings.handle, agent.address)
@@ -40,6 +41,21 @@ def build(settings: config.Settings, publish_manifests: bool = True, **overrides
         await chat.CLIENT.aclose()
 
     return agent
+
+
+def _publish_starter_prompts(agent: Agent) -> None:
+    """uagents 0.26.1 sends an empty starter_prompts list on mailbox /connect, which wipes
+    prompts set in the dashboard on every deploy. Fill them from profile.STARTER_PROMPTS.
+    Patches uagents-internal _build_registration_profile (pinned version)."""
+    base = agent._build_registration_profile
+
+    def _with_prompts():
+        prof = base()
+        if agent._publish_agent_details:
+            prof.starter_prompts = list(profile.STARTER_PROMPTS)
+        return prof
+
+    agent._build_registration_profile = _with_prompts
 
 
 if __name__ == "__main__":
