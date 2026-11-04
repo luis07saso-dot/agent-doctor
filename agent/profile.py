@@ -1,8 +1,9 @@
 """L6 Agentverse profile: one place for every public profile field.
 
 Published on mailbox `/connect` (uagents 0.26.1 sends name, handle, description, README,
-avatar; STARTER_PROMPTS added by agent/main.py). Keywords are NOT sent by `/connect`: the
-owner sets them in the Agentverse dashboard (KEYWORDS below is the source of truth).
+avatar; STARTER_PROMPTS added by agent/main.py). Keywords are NOT sent by `/connect`: set
+them with scripts/set_keywords.py (Agentverse target-keywords API) or the dashboard.
+KEYWORDS below is the source of truth; `set_keywords.py` shows live vs source.
 After changing anything here: redeploy, then re-run deploy/connect.sh.
 """
 from __future__ import annotations
