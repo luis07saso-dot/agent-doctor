@@ -37,7 +37,8 @@ log = logging.getLogger("agent-doctor.memory")
 def shown_to_dict(shown: Any) -> dict:
     return {"name": shown.name, "address": shown.address, "total": shown.total,
             "verdict": shown.verdict, "fixes": [asdict(c) for c in shown.fixes],
-            "rows": [asdict(r) for r in shown.rows], "facts": [list(p) for p in shown.facts]}
+            "rows": [asdict(r) for r in shown.rows], "facts": [list(p) for p in shown.facts],
+            "handle": getattr(shown, "handle", "")}
 
 
 def shown_from_dict(d: dict) -> Any:
@@ -46,7 +47,7 @@ def shown_from_dict(d: dict) -> Any:
     return Shown(str(d["name"]), str(d["address"]), tuple(Check(**c) for c in d["fixes"]),
                  int(d.get("total", 0)), str(d.get("verdict", "")),
                  tuple(Row(**r) for r in d.get("rows", ())),
-                 tuple((str(k), v) for k, v in d.get("facts", ())))
+                 tuple((str(k), v) for k, v in d.get("facts", ())), str(d.get("handle") or ""))
 
 
 class Memory:
@@ -83,15 +84,13 @@ class Memory:
             return None
         return item[2]
 
-    def latest_for_sender(self, sender_key: str) -> Any:
-        """Q17: the newest unexpired audit shown to `sender_key` in any chat, or None."""
+    def recent_for_sender(self, sender_key: str) -> list:
+        """Q17: unexpired audits shown to `sender_key` in any chat, newest first."""
         if not sender_key:
-            return None
+            return []
         now = self.clock()
-        for at, s, shown in reversed(list(self._chats.values())):  # newest put last
-            if s == sender_key and now - at <= self.chat_ttl:
-                return shown
-        return None
+        return [shown for at, s, shown in reversed(list(self._chats.values()))  # newest put last
+                if s == sender_key and now - at <= self.chat_ttl]
 
     def _prune_chats(self) -> None:
         now = self.clock()

@@ -209,7 +209,7 @@ your message
 - **Pre-Hire Check tests availability, not answer quality.** LIVE means the agent answered within 14 seconds; it does not judge the answer. An agent that acknowledges but answers after 14s shows as DEGRADED; one that does not even acknowledge shows as UNREACHABLE.
 - **Fix guides follow the last audit in the same chat.** `how do I fix #2` and `why this score?` need an audit earlier in that chat; it is kept for 24 hours, also across restarts. Guides follow the Agentverse docs; the Agentverse UI may change.
 - **Findability is information, not score.** It uses Agentverse search; ASI:One may rank agents differently. Agents without usable starter prompts get no findability line. A search that is slow shows "not checked": re-check a minute later.
-- **`re-check` remembers the last agent for 24 hours.** It uses the last audit in the same chat; `re-check`, `same agent` or `again` also reach your latest audit from an earlier chat. To check a different agent, send its address or handle.
+- **`re-check` remembers the last agent for 24 hours.** It uses the last audit in the same chat; `re-check`, `same agent` or `again` also reach your latest audit from an earlier chat. Naming it works too (`is that same tavily agent live?`): if the name doesn't match the agent I remember, I say so instead of guessing. To check a different agent, send its address or handle.
 - **Re-check diff needs an earlier check.** It compares with your last complete check of the same agent in the past 30 days.
 - **Weights are our estimate.** Agentverse does not publish its ranking weights. The rubric follows the official docs' emphasis; the same input always gives the same score.
 - **Keywords are not checked yet.** Make sure each keyword appears in your README.
@@ -230,6 +230,6 @@ your message
 - **Data sources**: public Agentverse search and Almanac APIs
 - **Privacy**: logs keep no message text; sender IDs are hashed; `forget` deletes stored audits
 - **Price**: free
-- **Version**: 0.10.2
+- **Version**: 0.10.3
 - **Maintainer**: [leedr.tech](https://leedr.tech)
 - **Built for**: Stranger Builds hackathon, Fetch.ai track

@@ -293,6 +293,7 @@ class Shown:
     verdict: str = ""
     rows: tuple = ()  # evidence.Row per check
     facts: tuple = ()  # (field, value) pairs from evidence.facts
+    handle: str = ""  # Q17b: matches "that same tavily agent" by handle too
 
     @property
     def facts_dict(self) -> dict:

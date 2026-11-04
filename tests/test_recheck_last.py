@@ -237,3 +237,112 @@ def test_report_tail_advertises_recheck():
 
 def test_help_mentions_recheck():
     assert "`re-check`" in router.HELP
+
+
+# ---------- Q17b: named back-references ("that same tavily agent"), live chat 2026-11-04 ----------
+
+TAVILY = STRONG
+WEATHER = "agent1qddwng42rgf0sm2nkvz7whf4xtmcfx8j725kz9nsd7zk4qx8jmwugr8p379"
+
+
+class Named(Client):
+    """Lookups return a profile with the given name/handle per address."""
+    NAMES = {TAVILY: ("Tavily Search Agent", "tavily-search"), WEATHER: ("Weather Bot", "weather-bot")}
+
+    async def lookup(self, a):
+        self.asked.append(a)
+        lk = load(self.fixture)
+        name, handle = self.NAMES.get(a, ("X", ""))
+        return replace(lk, address=a, profile={**(lk.profile or {}), "name": name, "handle": handle})
+
+
+def audit_addr(addr, chat="c1", sender="s1"):
+    return say(f"audit {addr}", Named(), chat, sender)
+
+
+def fake_prehire(seen):
+    async def prehire(target):
+        seen.append(target.value)
+        return "live!", "live"
+    return prehire
+
+
+@pytest.mark.parametrize("text,kind,last,hint", [
+    ("@agent-doctor send a prehire check to that same tavily agent", "prehire", "any", ("tavily",)),
+    ("pre-hire check the same tavily agent", "prehire", "any", ("tavily",)),
+    ("is that tavily agent live?", "prehire", "chat", ("tavily",)),
+    ("can you do a pre-hire check on the agent we were just auditing?", "prehire", "any", ()),
+    ("run a pre-hire check on the agent we were just talking about", "prehire", "any", ()),
+    ("is the one you just checked live?", "prehire", "any", ()),
+    ("is the agent from before live?", "prehire", "any", ()),
+    ("re-check that tavily search agent", "audit", "any", ("tavily", "search")),
+    ("check the weather agent", "audit", "chat", ("weather",)),
+])
+def test_named_back_references(text, kind, last, hint):
+    i = router.classify(text, SELF, (), True)
+    assert (i.kind, i.last, i.hint) == (kind, last, hint)
+
+
+@pytest.mark.parametrize("text", ["check the other agent", "audit another agent", "send a prehire check",
+                                  "what is the agent we audited", "check the first one"])
+def test_named_not_back_references(text):
+    assert router.classify(text, SELF, (), True).last == ""
+
+
+def test_hint_matches_name_or_handle():
+    assert router.hint_matches((), "Anything")
+    assert router.hint_matches(("tavily",), "Tavily Search Agent")
+    assert router.hint_matches(("tavily",), "Student Agent", "tavily-web-search-ag")
+    assert not router.hint_matches(("weather",), "Tavily Search Agent", "tavily-search")
+
+
+def test_live_chat_case_prehire_on_remembered_tavily_agent():
+    audit_addr(TAVILY)
+    seen = []
+    r = say("@agent-doctor send a prehire check to that same tavily agent", Named(),
+            prehire=fake_prehire(seen))
+    assert seen == [TAVILY] and r.outcome == "prehire_live" and r.input_type == "last"
+
+
+def test_named_mismatch_says_which_agent_it_remembers():
+    audit_addr(TAVILY)
+    seen = []
+    r = say("is that weather agent live?", Named(), prehire=fake_prehire(seen))
+    assert seen == [] and r.outcome == "last_mismatch" and "Tavily Search Agent" in r.text
+    assert "`is weather-bot live?`" in r.text
+    r = say("re-check the same weather agent", Named())
+    assert r.outcome == "last_mismatch" and "`audit weather-bot`" in r.text
+
+
+def test_named_picks_matching_audit_from_earlier_chat():
+    audit_addr(TAVILY, chat="c1")
+    audit_addr(WEATHER, chat="c2")  # newer, and this chat's last audit
+    c = Named()
+    say("re-check the same tavily agent", c, chat="c2")
+    assert c.asked == [TAVILY]
+
+
+def test_weak_named_stays_in_this_chat():
+    audit_addr(TAVILY, chat="c1")
+    audit_addr(WEATHER, chat="c2")
+    r = say("check the tavily agent", Named(), chat="c2")
+    assert r.outcome == "last_mismatch" and "Weather Bot" in r.text
+
+
+def test_nothing_remembered_strong_prehire_gets_prehire_help():
+    r = say("send a prehire check to that same tavily agent", Named())
+    assert r.outcome == "prehire_need_target"
+
+
+def test_handle_survives_restart_and_old_files_load(tmp_path, monkeypatch):
+    from agent import memory
+    p = str(tmp_path / "m.json")
+    guides.LAST.attach(p)
+    audit_addr(TAVILY)
+    run(guides.LAST.memory.flush())
+    monkeypatch.setattr(guides, "LAST", guides.LastAudit())
+    guides.LAST.attach(p)
+    assert guides.LAST.get("c1").handle == "tavily-search"
+    d = memory.shown_to_dict(guides.LAST.get("c1"))
+    d.pop("handle")
+    assert memory.shown_from_dict(d).handle == ""  # files written before Q17b

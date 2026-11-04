@@ -4,7 +4,8 @@ Never raises and never returns an empty reply. Outcome labels go to the request 
 ok | partial | not_found | invalid | api_down | timeout | help | need_target | bad_address |
 off_scope | fallback | fix_guide | fix_guide_none (Q5: no audit in this chat, or no such
 fix number), explain | explain_none (Q10 "why this score?": evidence for the last or named
-audit; none = no audit in this chat), forget | forget_error (Q15), card_profile (Q4 "Open profile" click), plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
+audit; none = no audit in this chat), forget | forget_error (Q15), recheck_none | last_mismatch
+(Q17: nothing remembered | remembered agent isn't the one named; input=last on re-use), card_profile (Q4 "Open profile" click), plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
 unknown | not_found | invalid | error | pending) and prehire_need_target.
 """
 from __future__ import annotations
@@ -92,7 +93,10 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
     intent = router.classify(text, self_handles, self_addresses, has_audit)
     via_last = bool(intent.last)
     if via_last:  # Q17: "re-check the same agent" -> the remembered agent's address
-        shown = _remembered(chat_key, sender_key, intent.last == "any")
+        shown, other = _remembered(chat_key, sender_key, intent.last == "any", intent.hint)
+        if shown is None and other is not None:  # Q17b: remembered agent isn't the one named
+            return Result(router.last_mismatch(other.name, intent.kind == "prehire"),
+                          "last_mismatch", "last")
         if shown is None:
             text_, outcome = router.reply(intent.fallback or router.Intent("recheck_none"))
             return Result(text_, outcome, "none")
@@ -196,14 +200,21 @@ def diff_key(sender_key: str, chat_key: str) -> str:
     return chat_key if os.getenv("DIFF_KEY", "").strip().lower() == "chat" else sender_key
 
 
-def _remembered(chat_key: str, sender_key: str, any_chat: bool) -> Optional[guides.Shown]:
+def _remembered(chat_key: str, sender_key: str, any_chat: bool,
+                hint: Iterable[str] = ()) -> tuple[Optional[guides.Shown], Optional[guides.Shown]]:
     """Q17: the agent "re-check the same agent" means: this chat's last audit, else (strong
-    wording only) this sender's latest audit in any chat. Not across chats when DIFF_KEY=chat
-    (ASI:One may relay many people under one sender: unverified, spec q15 F9)."""
-    shown = guides.LAST.get(chat_key)
-    if shown is None and any_chat and diff_key(sender_key, chat_key) == sender_key:
-        shown = guides.LAST.memory.latest_for_sender(sender_key)
-    return shown if shown is not None and shown.address else None
+    wording only) this sender's latest audits in any chat. Not across chats when DIFF_KEY=chat
+    (ASI:One may relay many people under one sender: unverified, spec q15 F9).
+    Q17b: with name words ("that same tavily agent"), the newest candidate whose name or handle
+    matches. Returns (match, None), or (None, newest candidate) when none matches, or (None, None)."""
+    found = [guides.LAST.get(chat_key)]
+    if any_chat and diff_key(sender_key, chat_key) == sender_key:
+        found += guides.LAST.memory.recent_for_sender(sender_key)
+    cands = [s for s in found if s is not None and s.address]
+    for s in cands:
+        if router.hint_matches(hint, s.name, s.handle):
+            return s, None
+    return None, (cands[0] if cands else None)
 
 
 def _recheck(lk: Lookup, sc: Any, key: str) -> Any:
@@ -291,7 +302,8 @@ async def handle_card(sel: "cards.Selection", client: LookupClient,
 def shown_for(lk: Lookup, sc: Any, name: str, address: str = "") -> guides.Shown:
     """What a chat remembers about an audit: top fixes (Q5) + the evidence (Q10)."""
     return guides.Shown(name, lk.address or address, sc.fixes[:TOP_FIXES], sc.total, sc.verdict,
-                        evidence.rows(lk, sc), tuple(evidence.facts(lk.profile).items()))
+                        evidence.rows(lk, sc), tuple(evidence.facts(lk.profile).items()),
+                        clean((lk.profile or {}).get("handle")))
 
 
 def _explain(chat_key: str, text: str) -> Result:

@@ -319,18 +319,62 @@ RECHECK_NONE = (
 # Q17: back-references to the last audited agent, in a message with no target. Strong ("re-check
 # the same agent", "check it again"): clearly an earlier agent, so it may come from an earlier
 # chat of this sender. Weak ("audit it", "is that agent live?"): only this chat's last audit.
+# Up to 3 describing words before the noun: "that same tavily agent", "the weather bot".
+_MID = (r"(?:(?!(?:for|of|in|on|to|with|from|and|or|by|at|about|is|are|was|were|we|you|i)\b)"
+        r"[a-z0-9][\w.-]*\s+){0,3}?")
+_NOUN = r"(?:agent|one|bot)"
 _BACK_STRONG = re.compile(
     r"\bre-?(?:check|audit|scan|run|test|score)(?:s|ed|ing)?\b"
-    r"|\bsame\s+(?:agent|one|bot|address|handle)\b"
+    r"|\bsame\s+" + _MID + r"(?:agent|one|bot|address|handle)\b"
     r"|\bre-?do\s+(?:the\s+|that\s+)?(?:audit|check|scan|it)\b"
-    r"|\b(?:last|previous|prior|earlier)\s+(?:agent|one|bot)\b", re.IGNORECASE)
+    r"|\b(?:last|previous|prior|earlier)\s+" + _MID + _NOUN + r"\b"
+    # Q17b: "the agent we were just auditing", "the one you checked", "that bot we talked about"
+    r"|\b(?:that|this|the)\s+" + _MID + _NOUN + r"\s+(?:(?:that|which)\s+)?(?:we|you|i)\s+"
+    r"(?:(?:were|was|have|had|'ve|just)\s+){0,2}(?:audit|check|talk|discuss|look|review|scor|"
+    r"test|scan)\w*"
+    r"|\b" + _NOUN + r"\s+(?:from\s+)?(?:before|earlier|above)\b", re.IGNORECASE)
 _AGAIN = re.compile(r"\bagain\b|\bone more time\b|\bonce more\b", re.IGNORECASE)
-_BACK_WEAK = re.compile(r"\bit\b|\b(?:that|this|the)\s+(?:agent|one|bot)\b", re.IGNORECASE)
+_BACK_WEAK = re.compile(r"\bit\b|\b(?:that|this|the)\s+" + _MID + _NOUN + r"\b", re.IGNORECASE)
 # Narrow on purpose: "how do I fix it / test it / do it" are questions, not re-checks.
 _RECHECK_VERB = re.compile(r"\b(?:audit|check|scan|score|analy[sz]e)\w*", re.IGNORECASE)
 # Weak cue: the verb must act on the reference ("check it", "audit that agent").
 _VERB_ON_REF = re.compile(r"\b(?:audit|check|scan|score|analy[sz]e)\s+(?:it|(?:that|this|the)\s+"
-                          r"(?:agent|one|bot))\b", re.IGNORECASE)
+                          + _MID + _NOUN + r")\b", re.IGNORECASE)
+# Q17b: describing words name the agent meant ("that same tavily agent"); the service checks
+# them against the remembered agent's name and handle. "the other agent" is not a back-reference.
+_HINT = re.compile(r"\b(?:same|that|this|the|last|previous|prior|earlier)\s+(" + _MID + r")"
+                   + _NOUN + r"\b", re.IGNORECASE)
+_HINT_SKIP = frozenset({"same", "that", "this", "the", "last", "previous", "prior", "earlier",
+                        "very", "exact", "a", "an", "ai", "my", "your", "our", "s"})
+_OTHER = frozenset({"other", "another", "different", "new", "next", "first", "second", "third"})
+
+
+def name_hint(text: str) -> tuple[str, ...]:
+    """Words naming the agent in a back-reference, e.g. ("tavily",). Lowercase, deduped."""
+    words: list[str] = []
+    for m in _HINT.finditer(text or ""):
+        for w in re.findall(r"[a-z0-9]+", m.group(1).lower()):
+            if w not in _HINT_SKIP and w not in words:
+                words.append(w)
+    return tuple(words)
+
+
+def hint_matches(hint: Iterable[str], name: str, handle: str = "") -> bool:
+    """True if no hint, or any hint word is in the agent's name or handle."""
+    hint = tuple(hint)
+    if not hint:
+        return True
+    hay = f"{name} {handle}".lower()
+    tokens = set(re.findall(r"[a-z0-9]+", hay))
+    compact = re.sub(r"[^a-z0-9]+", "", hay)
+    return any(w in tokens or (len(w) >= 4 and w in compact) for w in hint)
+
+
+def last_mismatch(name: str, prehire: bool) -> str:
+    ex = "`is weather-bot live?`" if prehire else "`audit weather-bot`"
+    return (f"The last agent I checked for you is **{name}**, and that doesn't look like the one "
+            f"you mean. Send the address, handle (no @) or Agentverse profile link of the agent "
+            f"you want, e.g. {ex}.")
 # Never a re-check request: questions about Doctor ("how do I re-check?", "what is a pre-hire
 # check again"), deleting data, explaining, refusals, "check it out", "I'll check it later".
 _NOT_RECHECK = re.compile(
@@ -349,6 +393,10 @@ def back_ref(text: str, wants_prehire: bool, has_audit: bool) -> str:
     """"any" (strong), "chat" (weak, needs an audit in this chat) or "" (not a back-reference)."""
     found = ""
     asked = False  # an earlier clause was a question: "what is X, again?", "what's Y? and Z"
+    if _OTHER.intersection(name_hint(text)):
+        return ""  # "check the other agent": not the last one
+    # "the agent we were just auditing": "just" here is not a clause break.
+    text = re.sub(r"\b(we|you|i|were|was|have|had|'ve)\s+just\b", r"\1", text, flags=re.I)
     for part in _CLAUSE.split(f" {text} "):
         part = part.strip()
         if not part:
@@ -380,6 +428,7 @@ class Intent:
     # Q17: target = the last audited agent ("any": this chat, else this sender's latest;
     # "chat": this chat only). None remembered -> `fallback`.
     last: str = ""
+    hint: tuple[str, ...] = ()  # Q17b: words naming the agent meant ("tavily")
 
 
 def classify(text: str, self_handles: Iterable[str] = (),
@@ -419,7 +468,9 @@ def classify(text: str, self_handles: Iterable[str] = (),
     ref = "" if soft else back_ref(text, wants_prehire, has_audit)
     if ref and not key:  # Q17: "re-check the same agent", "is it live?". FAQs win.
         return Intent("prehire" if wants_prehire else "audit", last=ref,
-                      fallback=Intent("recheck_none") if ref == "any" else base)
+                      hint=name_hint(text),
+                      fallback=(Intent("prehire_need_target") if wants_prehire
+                                else Intent("recheck_none")) if ref == "any" else base)
     if soft:
         kind = "prehire" if wants_prehire else "audit"
         target = (Target("handle", soft[0]),)
