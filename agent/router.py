@@ -257,6 +257,18 @@ _GREETING = re.compile(r"^\W*(hi|hello|hey|help|start|menu|commands?|usage|what 
                        r"what do you do|who are you|how does (?:this|it) work|thanks?|thank you)\b",
                        re.IGNORECASE)
 
+# Q11: a whole message that is only a greeting / thanks / "what can you do" (no question about
+# the audit in it). "help me fix my README" is not one.
+_BARE_GREETING = re.compile(
+    r"^\W*(?:hi|hello|hey|yo|help|start|menu|commands?|usage|thanks?|thank you|thx|ok(?:ay)?|"
+    r"cool|great|nice|what can you do|what do you do|who are you|how does (?:this|it) work)"
+    r"(?:\s+(?:there|again|so much|a lot|doctor|agent doctor))?\W*$", re.IGNORECASE)
+
+
+def is_greeting(text: str) -> bool:
+    return bool(_BARE_GREETING.match(text or ""))
+
+
 Kind = Literal["audit", "prehire", "help", "need_target", "prehire_need_target", "bad_address",
                "off_scope", "fix_guide", "faq", "explain", "explain_none", "forget",
                "recheck_none", "scout", "scout_need_what", "scout_pick_none"]

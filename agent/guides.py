@@ -90,6 +90,9 @@ SHORT: dict[str, str] = {
                         "\"Summarise this article: <link>\"."),
 }
 assert set(SHORT) | {"readme", "readme_sections"} == set(R.WEIGHTS)
+# Q11: one-line How for the two README checks (SHORT has none: their fixes carry the detail).
+README_HOW = ("How: Profile tab → Edit README; use the six sections (" + ", ".join(R.README_SECTIONS)
+              + ") with real input/output examples.")
 
 
 # ---------- full guide, on "how do I fix #N" ----------

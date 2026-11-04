@@ -155,6 +155,8 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
             extra["click"] = sel.action
         if res.card:
             extra["card"] = True
+        if res.llm:  # Q11: used | none | fallback | skip | off (never the text or the model output)
+            extra["llm"] = res.llm
         if res.scout_hits >= 0:  # Q13: counts only, never the search phrase
             extra["scout_hits"] = res.scout_hits
             if res.scout_live:

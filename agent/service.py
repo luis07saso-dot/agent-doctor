@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import time
 from dataclasses import dataclass, replace
 from typing import Any, Awaitable, Callable, Iterable, Optional, Protocol
 
-from agent import cards, evidence, findability, guides, recheck, router, scout
+from agent import cards, evidence, findability, guides, llm, recheck, router, scout
 from agent.agentverse import Lookup
 from agent.extract import Target
 from agent.report import PROFILE_URL, TOP_FIXES, clean, fit, format_report
@@ -70,6 +71,7 @@ class Result:
     find_top50: int = -1  # Q12: phrases where the agent was in the top 50
     scout_hits: int = -1  # Q13: agents listed by a scout reply
     scout_live: str = ""  # Q13: "<answered>/<probed>" when live tests ran
+    llm: str = ""  # Q11: "" not asked | used | none | fallback | skip | off
 
 
 async def handle(text: str, client: LookupClient, self_handles: Iterable[str] = (),
@@ -129,20 +131,21 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         return Result(router.FORGET_DONE if ok else router.FORGET_ERROR,
                       "forget" if ok else "forget_error", "none")
     if intent.kind == "explain" and not intent.targets:
-        return _explain(chat_key, text)
+        return await _followup(text, chat_key, _explain(chat_key, text), "explain")
     if intent.kind not in ("audit", "prehire", "explain"):
         text_, outcome = router.reply(intent)
-        return Result(text_, outcome, "none")
+        return await _followup(text, chat_key, Result(text_, outcome, "none"), intent.kind)
 
-    def soft_miss() -> Result:
+    async def soft_miss() -> Result:
         """A guessed mid-sentence handle Agentverse didn't confirm: answer the message as if
         there were no handle in it. Never an error reply for a guess."""
         fb = intent.fallback or router.Intent("help")
         if fb.kind == "explain":
             r = _explain(chat_key, text)
-            return Result(r.text, r.outcome, "soft_miss")
+            return await _followup(text, chat_key, Result(r.text, r.outcome, "soft_miss"),
+                                   "explain")
         text_, outcome = router.reply(fb)
-        return Result(text_, outcome, "soft_miss")
+        return await _followup(text, chat_key, Result(text_, outcome, "soft_miss"), fb.kind)
 
     target: Target = intent.targets[0]
     itype = "last" if via_last else "pick" if via_pick else target.kind  # log input type
@@ -156,18 +159,18 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         try:
             body, status = await asyncio.wait_for(prehire(target), PREHIRE_HARD_TIMEOUT_S)
         except asyncio.TimeoutError:
-            return soft_miss() if intent.soft else err(router.TIMEOUT, "prehire_error")
+            return await soft_miss() if intent.soft else err(router.TIMEOUT, "prehire_error")
         if intent.soft and status in ("not_found", "invalid", "error"):
-            return soft_miss()
+            return await soft_miss()
         return Result(fit(body, footer), f"prehire_{status}", itype, n, target.from_url)
 
     try:
         lk = await asyncio.wait_for(_lookup(client, target), HARD_TIMEOUT_S)
     except asyncio.TimeoutError:
-        return soft_miss() if intent.soft else err(router.TIMEOUT, "timeout")
+        return await soft_miss() if intent.soft else err(router.TIMEOUT, "timeout")
     if intent.soft and (lk.outcome not in ("ok", "partial")
                         or lk.profile_status in ("timeout", "api_down")):
-        return soft_miss()
+        return await soft_miss()
 
     # Profile fetch failed (not "not found"): any score would be a guess. Say so instead.
     if lk.outcome == "partial" and lk.profile_status in ("timeout", "api_down"):
@@ -341,6 +344,43 @@ def shown_for(lk: Lookup, sc: Any, name: str, address: str = "") -> guides.Shown
     return guides.Shown(name, lk.address or address, sc.fixes[:TOP_FIXES], sc.total, sc.verdict,
                         evidence.rows(lk, sc), tuple(evidence.facts(lk.profile).items()),
                         clean((lk.profile or {}).get("handle")))
+
+
+LLM_KINDS = ("explain", "help", "off_scope")  # Q11: rules replies the LLM may improve
+LLM_MIN_WORDS, LLM_MAX_WORDS = 2, 60
+
+
+async def _followup(text: str, chat_key: str, rules: Result, kind: str) -> Result:
+    """Q11 (SCOPE A1): after an audit in this chat, a question the rules only answered
+    generically. The LLM picks (ask, check, topic) from fixed lists; the reply is built from
+    the remembered audit. Not asked, off, slow or unsure -> `rules`, unchanged. Never raises."""
+    try:
+        shown = guides.LAST.get(chat_key)
+        if kind not in LLM_KINDS or shown is None or not shown.rows:
+            return rules
+        if not LLM_MIN_WORDS <= len(re.findall(r"\S+", text or "")) <= LLM_MAX_WORDS:
+            return rules
+        if kind == "help" and router.is_greeting(text):
+            return rules
+        if (kind == "explain" and evidence.topics(text)) or router.faq_key(text):
+            return rules  # the rules already know what it's about
+        f, label = await llm.MAPPER.map(text, chat_key)
+        if f is None or label != "used":
+            return replace(rules, llm=label)
+        if f.ask == "fix" and f.check != "none":
+            k = next((i + 1 for i, c in enumerate(shown.fixes) if c.rule == f.check), 0)
+            if k:
+                return replace(_fix_guide(k, chat_key), input_type=rules.input_type, llm="used")
+            row = next((r for r in shown.rows if r.rule == f.check), None)
+            if row is not None:
+                return Result(evidence.focus_reply(shown, row), "explain", rules.input_type,
+                              llm="used")
+        body = evidence.format_explain(shown, text,
+                                       (f.topic,) if f.topic != "none" else (),
+                                       f.check if f.check != "none" else "")
+        return Result(body, "explain", rules.input_type, llm="used")
+    except Exception:
+        return rules
 
 
 def _explain(chat_key: str, text: str) -> Result:

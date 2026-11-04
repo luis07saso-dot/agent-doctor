@@ -4,7 +4,7 @@ from typing import Optional
 
 from uagents import Agent
 
-from agent import chat, config, guides, profile
+from agent import chat, config, guides, llm, profile
 from agent.chat import chat_proto
 from agent.prehire import prehire_proto
 from agent.probe import PROBER
@@ -43,6 +43,7 @@ def build(settings: config.Settings, publish_manifests: bool = True, **overrides
     async def _close_client(ctx) -> None:
         await guides.LAST.memory.flush()  # Q15: don't lose the last debounced save
         await chat.CLIENT.aclose()
+        await llm.MAPPER.aclose()  # Q11
 
     return agent
 

@@ -18,6 +18,7 @@ It is built for agent builders asking "why is nobody finding my agent?". Think o
 - **Agentverse ranking checks**: active status, Chat Protocol, @handle, avatar, description, starter prompts, rating, interactions, ASI:One success rate, Testing results and website verification.
 - **ASI:One search visibility**: flags offline or unresponsive agents. Inactive agents are left out of ranking.
 - **Same input, same output**: rule-based scoring, no LLM guesswork. Results cached for 5 minutes.
+- **Ask about the audit in your own words**: after an audit, questions like "it has 769 chats, why do you say get real users?" or "how can I improve the avatar" get an answer from that audit's data. A small model only picks which check or topic you mean; every number and sentence comes from the audit.
 - **Free**. Quick answers take about a second. An audit also runs up to 3 Agentverse searches and waits at most 7 seconds for them. Replies that include a live test take up to 15 seconds.
 - **Pre-Hire Check (live test)**: ask `is my-weather-bot live?` and Agent Doctor sends that agent one test message, times its acknowledgement and answer, and adds its rating and profile score. Other agents can call it too (see "For agents").
 - **Why this score?**: after an audit, ask `why this score?` to see the data behind each check. A check Agentverse has no data for shows "no data" (0 points), not a failure.
@@ -212,12 +213,12 @@ your message
 
 Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 → audit score each (an agent the Almanac shows offline is dropped) → live test of the first 2 → pick.
 
-- **Rules decide, no AI model.** The score, the fixes and every answer come from fixed rules, so the same agent always gets the same score. No LLM reads your messages.
+- **Rules decide; AI only picks the topic.** The score, the fixes and every answer come from fixed rules and Agentverse data, so the same agent always gets the same score. After an audit, a follow-up question the rules don't recognise goes to a small model (ASI:One `asi1-mini`) that only chooses which check or topic it is about, from a fixed list. It never writes the answer, a number or a verdict. If it is off, slow (over 3.5 s) or failing, you get the rules answer.
 - **Agents hiring agents.** Agent Doctor speaks the Agent Chat Protocol and its own `AgentDoctorPreHire` protocol. For a live test it messages the other agent over Agentverse, like any agent would, and times the reply.
 - **Data used**: public Agentverse endpoints only (agent search, agent profile, Almanac registration and handles). No private data, no logins.
-- **Privacy**: logs keep no message text, and sender IDs are hashed. Agent Scout sends your search words (not your message) to Agentverse search and keeps the last list per chat for 24 hours in memory, so `audit #2` works. To power fix guides, `why this score?` and the re-check diff, Agent Doctor stores the last audit shown in a chat (24 hours) and the last score and pass/fail of each check per agent you checked (30 days, up to 20 agents). Keys are hashed; only public agent data (name, address, score, check results) is kept. Send `forget` to delete it.
+- **Privacy**: logs keep no message text, and sender IDs are hashed. Such a follow-up question is sent to the ASI:One API (Fetch.ai) with agent addresses and links removed, only to pick the topic; nothing else is sent. Agent Scout sends your search words (not your message) to Agentverse search and keeps the last list per chat for 24 hours in memory, so `audit #2` works. To power fix guides, `why this score?` and the re-check diff, Agent Doctor stores the last audit shown in a chat (24 hours) and the last score and pass/fail of each check per agent you checked (30 days, up to 20 agents). Keys are hashed; only public agent data (name, address, score, check results) is kept. Send `forget` to delete it.
 - **Reliability**: an error gets a short "try again" reply, never silence or a crash. Rate limits and a loop guard stop runaway agent-to-agent loops (a conversation that keeps flooding is paused for 24 hours). Runs 24/7 on a dedicated server with a watchdog and one-step rollback.
-- **Tested**: 795 automated tests, plus live checks on ASI:One.
+- **Tested**: 1,203 automated tests, plus live checks on ASI:One.
 
 ## Use cases
 
@@ -237,6 +238,7 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **Findability is information, not score.** It uses Agentverse search; ASI:One may rank agents differently. Agents without usable starter prompts get no findability line. A search that is slow shows "not checked": re-check a minute later.
 - **`re-check` remembers the last agent for 24 hours.** It uses the last audit in the same chat; `re-check`, `same agent` or `again` also reach your latest audit from an earlier chat. Naming it works too (`is that same tavily agent live?`): if the name doesn't match the agent I remember, I say so instead of guessing. To check a different agent, send its address or handle.
 - **Re-check diff needs an earlier check.** It compares with your last complete check of the same agent in the past 30 days.
+- **Follow-up questions need an audit in the same chat.** Without one, or for a one-word message, you get the standard reply. The model can pick the wrong check; the answer then shows that check's data, never invented facts.
 - **Weights are our estimate.** Agentverse does not publish its ranking weights. The rubric follows the official docs' emphasis; the same input always gives the same score.
 - **Keywords are not checked yet.** Make sure each keyword appears in your README.
 - **Mainnet only.** Testnet agents are not checked.
