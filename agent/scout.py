@@ -243,12 +243,14 @@ async def run(phrase: str, client: Any, probe: Optional[ProbeFn], deadline: floa
         return ScoutResult("api_down", phrase)
     if st != "ok":
         return ScoutResult("timeout" if st == "timeout" else "api_down", phrase)
-    picked = candidates(hits, self_addresses, self_handles)
-    if not picked:
-        return ScoutResult("none", phrase)
-
-    # Static list first: any later error still returns it.
-    cands: list[Cand] = [c for c in (_cand(r, h, None) for r, h in picked) if c is not None]
+    try:
+        picked = candidates(hits, self_addresses, self_handles)
+        if not picked:
+            return ScoutResult("none", phrase)
+        # Static list first: any later error still returns it.
+        cands: list[Cand] = [c for c in (_cand(r, h, None) for r, h in picked) if c is not None]
+    except Exception:  # odd search data: a scout reply, never the generic fallback
+        return ScoutResult("api_down", phrase)
     res = ScoutResult("ok", phrase, tuple(cands), 1 if cands else 0, "untested" if cands else "none")
     try:
         # Lookups: same score as an audit (Almanac included, spec F14).

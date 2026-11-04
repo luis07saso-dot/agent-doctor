@@ -41,9 +41,13 @@ def build(settings: config.Settings, publish_manifests: bool = True, **overrides
 
     @agent.on_event("shutdown")
     async def _close_client(ctx) -> None:
-        await guides.LAST.memory.flush()  # Q15: don't lose the last debounced save
-        await chat.CLIENT.aclose()
-        await llm.MAPPER.aclose()  # Q11
+        try:
+            await guides.LAST.memory.flush()  # Q15: don't lose the last debounced save
+        finally:
+            try:
+                await chat.CLIENT.aclose()
+            finally:
+                await llm.MAPPER.aclose()  # Q11
 
     return agent
 

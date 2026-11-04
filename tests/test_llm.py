@@ -118,7 +118,8 @@ def test_bad_output_falls_back(on, resp):
 @pytest.mark.parametrize("status,off", [(400, llm.OFF_AUTH_S), (401, llm.OFF_AUTH_S),
                                         (402, llm.OFF_AUTH_S), (403, llm.OFF_AUTH_S),
                                         (429, llm.OFF_BUSY_S), (500, llm.OFF_BUSY_S),
-                                        (502, llm.OFF_BUSY_S)])
+                                        (502, llm.OFF_BUSY_S), (404, llm.OFF_AUTH_S),
+                                        (422, llm.OFF_AUTH_S)])
 def test_breaker(on, status, off):
     m, clock = mapper((status, {"error": {"message": "x"}}), ok("explain", "rating"))
     assert run(m.map("why low?")) == (None, "fallback")
@@ -126,6 +127,13 @@ def test_breaker(on, status, off):
     clock.t += off + 0.1
     f, label = run(m.map("why low?"))
     assert label == "used" and not m.open()
+
+
+def test_scrub_email_and_tokens():
+    out = llm.scrub("mail me at jo.doe+x@mail.example.com key sk-" + "A1b2" * 10 + " why low?")
+    assert "@" not in out and "A1b2A1b2" not in out
+    assert "[email]" in out and "[token]" in out and out.endswith("why low?")
+    assert llm.scrub("why is my rating low") == "why is my rating low"
 
 
 def test_timeout_and_exception(on):

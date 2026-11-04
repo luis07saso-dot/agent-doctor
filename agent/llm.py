@@ -103,11 +103,14 @@ def enabled() -> bool:
 
 _ADDR = re.compile(r"(?<![0-9a-z])agent1[0-9a-z]{20,}", re.IGNORECASE)
 _URL = re.compile(r"https?://\S+|www\.\S+", re.IGNORECASE)
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_LONG = re.compile(r"[A-Za-z0-9_\-+/=]{32,}")  # keys / tokens / hashes
 
 
 def scrub(text: str) -> str:
-    """What leaves Doctor: no agent addresses, no links (spec §3.2)."""
-    return _URL.sub("[link]", _ADDR.sub("[agent]", text or ""))[:MAX_TEXT_CHARS]
+    """What leaves Doctor: no agent addresses, links, emails or long tokens (spec §3.2)."""
+    t = _URL.sub("[link]", _ADDR.sub("[agent]", text or ""))
+    return _LONG.sub("[token]", _EMAIL.sub("[email]", t))[:MAX_TEXT_CHARS]
 
 
 def body_for(text: str) -> dict:
@@ -194,6 +197,9 @@ class Mapper:
             return None, "fallback"
         if status == 429 or status >= 500:
             self._trip(OFF_BUSY_S)
+            return None, "fallback"
+        if status != 200:  # 404/422 etc.: deterministic, don't burn a call per message
+            self._trip(OFF_AUTH_S)
             return None, "fallback"
         f = parse(status, data)
         if f is None:

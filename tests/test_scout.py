@@ -506,3 +506,10 @@ def test_chat_logs_scout_counts_not_phrase(monkeypatch):
     rec = json.loads(req[4:])
     assert rec["outcome"] == "scout_ok" and rec["scout_hits"] == 5
     assert "flights" not in req
+
+
+def test_odd_search_data_gives_scout_reply(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("odd")
+    monkeypatch.setattr(scout, "candidates", boom)
+    assert go().status == "api_down"
