@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+from typing import Any
 
 from uagents import Context, Protocol
 from uagents_core.contrib.protocols.chat import (  # noqa: I001
@@ -108,10 +109,12 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
             ctx.logger.error(f"probe reply handler failed: {type(e).__name__}")
         return
 
-    async def run_prehire(target) -> tuple[str, str]:
-        r = await prehire.run_check(ctx, target, CLIENT, PROBER, True, target.label,
-                                    deadline=started + service.REPLY_BUDGET_S)
-        return prehire.format_text(r, target.label), r.status
+    async def run_prehire(target) -> tuple[str, str, Any]:
+        r, lk = await prehire.run_check_full(ctx, target, CLIENT, PROBER, True, target.label,
+                                             deadline=started + service.REPLY_BUDGET_S)
+        name = ((lk.profile or {}).get("name") if lk is not None and r.trust_score is not None
+                else "")  # Q18: title by name, not the raw address
+        return prehire.format_text(r, target.label, name or ""), r.status, lk
 
     try:
         text = _cut(msg.text().strip()).strip()

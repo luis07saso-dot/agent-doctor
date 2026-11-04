@@ -144,7 +144,7 @@ def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "",
         else:
             body += ["", "No fixes needed. Keep it online and answering."]
         block = find_block(find, c("active").ok, find_level) if find_level < 4 else ""
-        return "\n".join(body + details + (["", block] if block else []))
+        return hard_breaks("\n".join(body + details + (["", block] if block else [])))
 
     for n_how in range(len(fixes), -1, -1):
         for d_level in diff_levels:
@@ -210,6 +210,39 @@ def _flag_note(profile: dict, live: Any = None, ask: str = "") -> str:
     if isinstance(rate, (int, float)) and not isinstance(rate, bool):
         note += f" Recent ASI:One success rate: {max(0.0, min(1.0, float(rate))):.0%}."
     return note + "_"
+
+
+_LIST = re.compile(r"\s{0,3}(?:(\d{1,2})[.)]|[-*+])\s")
+
+
+def _starts_item(line: str, nxt: str) -> bool:
+    """`nxt` starts a list item on its own line anyway (CommonMark 0.31.2 §5.2/5.3): a bullet
+    or "1." may interrupt a paragraph; "2." only continues a list (`line` is an item or its
+    indented continuation)."""
+    m = _LIST.match(nxt)
+    if not m:
+        return False
+    return m.group(1) in (None, "1") or bool(_LIST.match(line)) or line.startswith(" ")
+
+
+def hard_breaks(text: str) -> str:
+    """Two trailing spaces (Markdown hard break) on each line followed by another non-empty
+    line. ASI:One joins single-newline lines into one paragraph ("answer none Profile: ...",
+    seen 2026-11-02 and in the 2026-11-04 Scout test, FB-3). Blank-line paragraph breaks,
+    ``` fences, lines already ending in two spaces and lines before a list item that starts
+    its own line anyway (_starts_item) are left alone."""
+    lines = text.split("\n")
+    fence = False
+    for i, line in enumerate(lines[:-1]):
+        if line.lstrip().startswith("```"):
+            fence = not fence
+            continue
+        nxt = lines[i + 1]
+        if fence or not line.strip() or not nxt.strip() or line.endswith("  ") or (
+                _starts_item(line, nxt)):
+            continue
+        lines[i] = line + "  "
+    return "\n".join(lines)
 
 
 def fit(text: str, footer: str = "") -> str:

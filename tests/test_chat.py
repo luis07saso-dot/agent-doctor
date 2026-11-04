@@ -387,3 +387,23 @@ def test_first_message_audit_reaches_the_real_target(monkeypatch):
     rec = ctx.reqs()[0]
     assert rec["input"] == "address" and rec["targets"] == 1
     assert "send the others" not in ctx.replies()[0].lower()
+
+
+def test_chat_prehire_title_by_name_then_audit_this_agent(monkeypatch):
+    """Q18 (FB-3): the chat Pre-Hire names the agent and the chat remembers it."""
+    from agent import guides, prehire
+    monkeypatch.setattr(guides, "LAST", guides.LastAudit())
+    lk = fixture_lookup("strong")
+
+    async def fake_full(ctx, target, client, prober, live, query, deadline=None):
+        from agent.probe import ProbeResult
+        return prehire.build_result(query, target.value, lk,
+                                    ProbeResult(target.value, "degraded", 1800, None)), lk
+    monkeypatch.setattr(prehire, "run_check_full", fake_full)
+    ctx = FakeCtx()
+    run(ctx, f"is {STRONG} live?")
+    name = lk.profile["name"]
+    assert ctx.replies()[0].startswith(f"**Pre-Hire Check: {name}**")
+    run(ctx, "audit this agent for me")
+    rec = ctx.reqs()[-1]
+    assert rec["outcome"] == "ok" and rec["input"] == "last" and chat.CLIENT.calls[-1] == STRONG

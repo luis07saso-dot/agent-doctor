@@ -103,7 +103,7 @@ pre-hire check agent1q...
 Example output:
 
 ```text
-Pre-Hire Check: @my-weather-bot
+Pre-Hire Check: My Weather Bot
 LIVE: it answered a test message just now.
 Live test: ack 1.4s · answer 4.9s
 Profile: ✅ Active · ✅ Chat Protocol · Rating 3.2/5 · Doctor score 71/100
@@ -216,9 +216,9 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **Rules decide; AI only picks the topic.** The score, the fixes and every answer come from fixed rules and Agentverse data, so the same agent always gets the same score. After an audit, a follow-up question the rules don't recognise goes to a small model (ASI:One `asi1-mini`) that only chooses which check or topic it is about, from a fixed list. It never writes the answer, a number or a verdict. If it is off, slow (over 3.5 s) or failing, you get the rules answer.
 - **Agents hiring agents.** Agent Doctor speaks the Agent Chat Protocol and its own `AgentDoctorPreHire` protocol. For a live test it messages the other agent over Agentverse, like any agent would, and times the reply.
 - **Data used**: public Agentverse endpoints only (agent search, agent profile, Almanac registration and handles). No private data, no logins.
-- **Privacy**: logs keep no message text, and sender IDs are hashed. Such a follow-up question is sent to the ASI:One API (Fetch.ai) with agent addresses, links, emails and long tokens removed, only to pick the topic; nothing else is sent. Agent Scout sends your search words (not your message) to Agentverse search and keeps the last list per chat for 24 hours in memory, so `audit #2` works. To power fix guides, `why this score?` and the re-check diff, Agent Doctor stores the last audit shown in a chat (24 hours) and the last score and pass/fail of each check per agent you checked (30 days, up to 20 agents). Keys are hashed; only public agent data (name, address, score, check results) is kept. Send `forget` to delete it.
+- **Privacy**: logs keep no message text, and sender IDs are hashed. Such a follow-up question is sent to the ASI:One API (Fetch.ai) with agent addresses, links, emails and long tokens removed, only to pick the topic; nothing else is sent. Agent Scout sends your search words (not your message) to Agentverse search and keeps the last list per chat for 24 hours in memory, so `audit #2` works. To power fix guides, `why this score?` and the re-check diff, Agent Doctor stores the last agent audited or checked in a chat (24 hours) and the last score and pass/fail of each check per agent you checked (30 days, up to 20 agents). Keys are hashed; only public agent data (name, address, score, check results) is kept. Send `forget` to delete it.
 - **Reliability**: an error gets a short "try again" reply, never silence or a crash. Rate limits and a loop guard stop runaway agent-to-agent loops (a conversation that keeps flooding is paused for 24 hours). Runs 24/7 on a dedicated server with a watchdog and one-step rollback.
-- **Tested**: 1,207 automated tests, plus live checks on ASI:One.
+- **Tested**: 1,225 automated tests, plus live checks on ASI:One.
 
 ## Use cases
 
@@ -236,7 +236,7 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **Pre-Hire Check tests availability, not answer quality.** LIVE means the agent answered within 14 seconds; it does not judge the answer. An agent that acknowledges but answers after 14s shows as DEGRADED; one that does not even acknowledge shows as UNREACHABLE.
 - **Fix guides follow the last audit in the same chat.** `how do I fix #2` and `why this score?` need an audit earlier in that chat; it is kept for 24 hours, also across restarts. Guides follow the Agentverse docs; the Agentverse UI may change.
 - **Findability is information, not score.** It uses Agentverse search; ASI:One may rank agents differently. Agents without usable starter prompts get no findability line. A search that is slow shows "not checked": re-check a minute later.
-- **`re-check` remembers the last agent for 24 hours.** It uses the last audit in the same chat; `re-check`, `same agent` or `again` also reach your latest audit from an earlier chat. Naming it works too (`is that same tavily agent live?`): if the name doesn't match the agent I remember, I say so instead of guessing. To check a different agent, send its address or handle.
+- **`re-check` remembers the last agent for 24 hours.** It uses the last agent audited or Pre-Hire checked in the same chat (right after an Agent Scout list, `audit it` asks which one; `audit the autonomad agent` picks it by name); `re-check`, `same agent` or `again` also reach your latest audit from an earlier chat. Naming it works too (`is that same tavily agent live?`): if the name doesn't match the agent I remember, I say so instead of guessing. To check a different agent, send its address or handle.
 - **Re-check diff needs an earlier check.** It compares with your last complete check of the same agent in the past 30 days.
 - **Follow-up questions need an audit in the same chat.** Without one, or for a one-word message, you get the standard reply. The model can pick the wrong check; the answer then shows that check's data, never invented facts.
 - **Weights are our estimate.** Agentverse does not publish its ranking weights. The rubric follows the official docs' emphasis; the same input always gives the same score.
@@ -259,6 +259,6 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **Data sources**: public Agentverse search and Almanac APIs
 - **Privacy**: logs keep no message text; sender IDs are hashed; `forget` deletes stored audits
 - **Price**: free
-- **Version**: 0.11.0
+- **Version**: 0.11.1
 - **Maintainer**: [leedr.tech](https://leedr.tech)
 - **Built for**: Stranger Builds hackathon, Fetch.ai track

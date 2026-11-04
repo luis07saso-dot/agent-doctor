@@ -5,7 +5,8 @@ ok | partial | not_found | invalid | api_down | timeout | help | need_target | b
 off_scope | fallback | fix_guide | fix_guide_none (Q5: no audit in this chat, or no such
 fix number), explain | explain_none (Q10 "why this score?": evidence for the last or named
 audit; none = no audit in this chat), forget | forget_error (Q15), recheck_none | last_mismatch
-(Q17: nothing remembered | remembered agent isn't the one named; input=last on re-use), card_profile (Q4 "Open profile" click), plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
+(Q17: nothing remembered | remembered agent isn't the one named; input=last on re-use),
+scout_which (Q18: "audit it" right after a scout list: which one?), card_profile (Q4 "Open profile" click), plus for Pre-Hire Check: prehire_<status> (live | degraded | unreachable |
 unknown | not_found | invalid | error | pending) and prehire_need_target.
 """
 from __future__ import annotations
@@ -14,13 +15,14 @@ import asyncio
 import os
 import re
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, replace
 from typing import Any, Awaitable, Callable, Iterable, Optional, Protocol
 
 from agent import cards, evidence, findability, guides, llm, recheck, router, scout
 from agent.agentverse import Lookup
 from agent.extract import Target
-from agent.report import PROFILE_URL, TOP_FIXES, clean, fit, format_report
+from agent.report import PROFILE_URL, TOP_FIXES, clean, fit, format_report, short_address
 from agent.scorer import UNRESPONSIVE_FLAG, score
 
 HARD_TIMEOUT_S = 13.5  # client caps itself at 12s; this is the belt to its braces
@@ -51,7 +53,8 @@ class LookupClient(Protocol):
 
 # Pre-Hire Check for one target -> (reply text, status). Injected by the chat handler, which
 # owns the context the live probe needs. None = Pre-Hire wording is answered with an audit.
-PreHireFn = Callable[[Target], Awaitable[tuple[str, str]]]
+# Q18: may add a 3rd item, the profile Lookup, so the chat remembers the agent it checked.
+PreHireFn = Callable[[Target], Awaitable[tuple]]
 # Live probe of one address -> ProbeResult (agent/probe.py). Injected by the chat handler.
 # Used only when Agentverse flags the audited agent "unresponsive" (user decision Q2-D1).
 ProbeFn = Callable[[str], Awaitable[Any]]
@@ -113,8 +116,22 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
                           "pick")
         intent = replace(intent, targets=(Target("address", listed[intent.pick - 1][0]),), pick=0)
     via_last = bool(intent.last)
-    if via_last:  # Q17: "re-check the same agent" -> the remembered agent's address
+    if via_last and listed and _LATEST.get(chat_key) == "scout":
+        # Q18: right after a scout list, "audit it" / "is that agent live?" can mean any listed
+        # agent. A name word that fits one of them picks it; no name (weak wording) -> ask.
+        hits = _list_hits(listed, intent.hint)
+        if len(hits) == 1:
+            intent = replace(intent, targets=(Target("address", hits[0]),), last="",
+                             fallback=None)
+        elif len(hits) > 1 or (intent.last == "chat" and not intent.hint):
+            return Result(router.scout_which(len(listed), intent.kind == "prehire"),
+                          "scout_which", "last")
+    if via_last and intent.last:  # Q17: "re-check the same agent" -> the remembered agent's address
         shown, other = _remembered(chat_key, sender_key, intent.last == "any", intent.hint)
+        if shown is None and listed:  # Q18: "audit the autonomad one": a listed agent's name
+            hits = _list_hits(listed, intent.hint)
+            if len(hits) == 1:
+                shown, other = guides.Shown("", hits[0], ()), None
         if shown is None and other is not None:  # Q17b: remembered agent isn't the one named
             return Result(router.last_mismatch(other.name, intent.kind == "prehire"),
                           "last_mismatch", "last")
@@ -128,6 +145,7 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
     if intent.kind == "forget":
         ok = await guides.LAST.memory.forget(diff_key(sender_key, chat_key), chat_key, sender_key)
         scout.LISTS.drop_sender(sender_key, chat_key)
+        _LATEST.pop(chat_key, None)
         return Result(router.FORGET_DONE if ok else router.FORGET_ERROR,
                       "forget" if ok else "forget_error", "none")
     if intent.kind == "explain" and not intent.targets:
@@ -157,11 +175,13 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
 
     if intent.kind == "prehire" and prehire is not None:
         try:
-            body, status = await asyncio.wait_for(prehire(target), PREHIRE_HARD_TIMEOUT_S)
+            res = await asyncio.wait_for(prehire(target), PREHIRE_HARD_TIMEOUT_S)
         except asyncio.TimeoutError:
             return await soft_miss() if intent.soft else err(router.TIMEOUT, "prehire_error")
+        body, status = res[0], res[1]
         if intent.soft and status in ("not_found", "invalid", "error"):
             return await soft_miss()
+        _remember_checked(res[2] if len(res) > 2 else None, chat_key, sender_key)
         return Result(fit(body, footer), f"prehire_{status}", itype, n, target.from_url)
 
     try:
@@ -181,7 +201,7 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         sc = score(lk)
         name = clean((lk.profile or {}).get("name")) or clean(target.label)
         shown = shown_for(lk, sc, name)
-        guides.LAST.put(chat_key, shown, sender_key)
+        _remember(chat_key, shown, sender_key)
         return Result(evidence.format_explain(shown, text), "explain", itype, n,
                       target.from_url, lk.cached)
 
@@ -199,7 +219,7 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         body = format_report(lk, sc, live=live, footer=footer, find=find, diff=diff)
         name = clean((lk.profile or {}).get("name")) or clean(target.label)
         top = sc.fixes[:TOP_FIXES]
-        guides.LAST.put(chat_key, shown_for(lk, sc, name), sender_key)
+        _remember(chat_key, shown_for(lk, sc, name), sender_key)
         live_status = live if isinstance(live, str) else str(getattr(live, "status", "") or "")
         f_items = find.items if find is not None else ()
         return Result(body, lk.outcome, itype, n, target.from_url, lk.cached, live_status,
@@ -228,9 +248,54 @@ async def _scout(phrase: str, client: Any, probe: Optional[ProbeFn], self_handle
         res = scout.ScoutResult("timeout", phrase)
     if res.cands:
         scout.LISTS.put(chat_key, sender_key, scout.items(res))
+        _mark(chat_key, "scout")
     return Result(scout.format_reply(res), f"scout_{res.status}", "none",
                   scout_hits=len(res.cands),
                   scout_live=f"{res.live}/{res.probed}" if res.probed else "")
+
+
+# Q18 (FB-3): what this chat saw last, "agent" (audit, explain, Pre-Hire Check, card) or
+# "scout" (a list). "audit this agent" means the newest of them, not an older audit. In memory
+# only: after a restart the remembered audit (Q15) is used, as before.
+_LATEST: "OrderedDict[str, str]" = OrderedDict()
+LATEST_MAX = 2000
+
+
+def _mark(chat_key: str, kind: str) -> None:
+    if not chat_key:
+        return
+    _LATEST[chat_key] = kind
+    _LATEST.move_to_end(chat_key)
+    while len(_LATEST) > LATEST_MAX:
+        _LATEST.popitem(last=False)
+
+
+def _remember(chat_key: str, shown: guides.Shown, sender_key: str) -> None:
+    guides.LAST.put(chat_key, shown, sender_key)
+    _mark(chat_key, "agent")
+
+
+def _remember_checked(lk: Any, chat_key: str, sender_key: str) -> None:
+    """Q18 (FB-3): after a Pre-Hire Check, "audit this agent", "why this score?" and "how do I
+    fix #1" are about the agent just checked (its reply showed its Doctor score). Only with a
+    clean profile lookup; else the chat keeps what it had. Never raises."""
+    try:
+        if lk is None or lk.outcome not in ("ok", "partial") or not lk.address or (
+                lk.profile_status in ("timeout", "api_down")):
+            return
+        sc = score(lk)
+        name = clean((lk.profile or {}).get("name")) or short_address(lk.address)
+        _remember(chat_key, shown_for(lk, sc, name), sender_key)
+    except Exception:
+        return
+
+
+def _list_hits(listed: Iterable[tuple[str, str]], hint: Iterable[str]) -> list[str]:
+    """Addresses of listed (scout) agents whose name fits the name words. None without words."""
+    hint = tuple(hint)
+    if not hint:
+        return []
+    return [a for a, name in listed if router.hint_matches(hint, name)]
 
 
 def diff_key(sender_key: str, chat_key: str) -> str:
@@ -324,7 +389,7 @@ async def handle_card(sel: "cards.Selection", client: LookupClient,
                     return Result(router.NO_AUDIT_YET, "fix_guide_none", "address")
                 sc = score(lk)
                 name = clean((lk.profile or {}).get("name")) or "this agent"
-                guides.LAST.put(chat_key, shown_for(lk, sc, name, sel.address), sender_key)
+                _remember(chat_key, shown_for(lk, sc, name, sel.address), sender_key)
             return _fix_guide(sel.n, chat_key)
         if sel.action == cards.PROFILE:
             return Result(PROFILE_OPENED.format(url=PROFILE_URL.format(address=sel.address)),

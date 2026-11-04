@@ -97,6 +97,14 @@ async def run_check(ctx: Any, target: Target, client: Any, prober: Prober = PROB
     """Never raises. Bounded by CHECK_TIMEOUT_S.
     `deadline` (time.monotonic(), chat path only): stop waiting for the live probe then and
     return status PENDING. The probe itself keeps running and its result is cached."""
+    return (await run_check_full(ctx, target, client, prober, live_probe, query, deadline))[0]
+
+
+async def run_check_full(ctx: Any, target: Target, client: Any, prober: Prober = PROBER,
+                         live_probe: bool = True, query: str = "",
+                         deadline: float | None = None) -> tuple[PreHireResult, Any]:
+    """run_check plus the profile Lookup it used (None if there was none). Chat path (Q18):
+    the reply names the agent, and the chat remembers it as the last agent checked."""
     query = (query or target.label)[:200]
     try:
         return await asyncio.wait_for(
@@ -104,28 +112,28 @@ async def run_check(ctx: Any, target: Target, client: Any, prober: Prober = PROB
             CHECK_TIMEOUT_S)
     except asyncio.TimeoutError:
         return PreHireResult(query=query, status="error", detail="timeout",
-                             checked_at=_iso(time.time()))
+                             checked_at=_iso(time.time())), None
     except Exception:
         return PreHireResult(query=query, status="error", detail="internal",
-                             checked_at=_iso(time.time()))
+                             checked_at=_iso(time.time())), None
 
 
 async def _run_check(ctx, target: Target, client, prober: Prober, live_probe: bool,
-                     query: str, deadline: float | None = None) -> PreHireResult:
+                     query: str, deadline: float | None = None) -> tuple[PreHireResult, Any]:
     address = target.value if target.kind == "address" else None
     if address is None:
         outcome, address = await client.resolve_handle(target.value)
         if address is None:
             status = {"not_found": "not_found", "invalid": "invalid"}.get(outcome, "error")
             return PreHireResult(query=query, status=status, detail=str(outcome),
-                                 checked_at=_iso(time.time()))
+                                 checked_at=_iso(time.time())), None
 
     if live_probe:
         lk, pr = await asyncio.gather(client.lookup(address),
                                       _probe_until(prober, ctx, address, deadline))
     else:
         lk, pr = await client.lookup(address), None
-    return build_result(query, address, lk, pr)
+    return build_result(query, address, lk, pr), lk
 
 
 async def _probe_until(prober: Prober, ctx: Any, address: str,
@@ -245,8 +253,10 @@ async def on_prehire(ctx: Context, sender: str, msg: PreHireRequest) -> None:
 
 # ---------- chat text (humans) ----------
 
-def format_text(r: PreHireResult, label: str) -> str:
-    """Short verdict for the chat path. Copy: docs/drafts/phase-p-chat-copy.md."""
+def format_text(r: PreHireResult, label: str, name: str = "") -> str:
+    """Short verdict for the chat path. Copy: docs/drafts/phase-p-chat-copy.md.
+    `name` (Q18): the agent's profile name for the title; `label` (what the user sent) is
+    kept for follow-up commands, since a name is not a valid target."""
     who = report.clean(label, 70)
     if r.status == "not_found":
         return (f"I couldn't find {who} on Agentverse (mainnet). "
@@ -263,7 +273,8 @@ def format_text(r: PreHireResult, label: str) -> str:
         "degraded": "DEGRADED: it acknowledged a test message but sent no answer in time.",
         "unreachable": "UNREACHABLE: no acknowledgement and no answer to a test message.",
     }.get(r.status, "UNKNOWN: I couldn't run the live test this time. Try again in a minute.")
-    lines = [f"**Pre-Hire Check: {who}**", f"**{head}**"]
+    title = report.clean(name, 40).replace("@", "") if name else ""
+    lines = [f"**Pre-Hire Check: {title or who}**", f"**{head}**"]
 
     if r.status in ("live", "degraded", "unreachable"):
         ack = f"{r.ack_ms / 1000:.1f}s" if r.ack_ms is not None else "none"
@@ -298,4 +309,4 @@ def format_text(r: PreHireResult, label: str) -> str:
                       "Results are cached for 10 minutes._"]
     if r.address:
         lines.append(f"Full profile audit: `audit {r.address}`")
-    return report.fit("\n".join(lines))
+    return report.fit(report.hard_breaks("\n".join(lines)))

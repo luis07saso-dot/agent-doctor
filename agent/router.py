@@ -444,6 +444,15 @@ SCOUT_PICK_NONE = ("I don't have a recent agent search in this chat. Ask `find a
                    "first, e.g. `find an agent that books flights`.")
 
 
+def scout_which(count: int, prehire: bool = False) -> str:
+    """Q18: "audit it" right after a scout list, with no name: which listed agent?"""
+    n = 2 if count >= 2 else 1
+    first = f"`is #{n} live?` for a live test, or `audit #{n}` for a full report" if prehire \
+        else f"`audit #{n}` for a full report, or `is #{n} live?` for a live test"
+    return (f"Which agent from my list do you mean (1–{count})? Say {first}."
+            if count > 1 else f"Do you mean the agent in my list? Say {first}.")
+
+
 def scout_pick_short(n: int, count: int) -> str:
     s = "" if count == 1 else "s"
     return (f"I listed only {count} agent{s} in my last search, so there's no #{n}. "
@@ -599,7 +608,8 @@ def classify(text: str, self_handles: Iterable[str] = (),
     if has_audit and key in ("", "score") and (explain or key == "score") and not wants_prehire \
             and not _AUDIT_CMD.search(text):
         return Intent("explain")  # about the last audit in this chat
-    ref = "" if soft else back_ref(text, wants_prehire, has_audit)
+    # Q18: a scout list also gives "audit it" something to mean (the service asks which one).
+    ref = "" if soft else back_ref(text, wants_prehire, has_audit or has_scout)
     if ref and not key:  # Q17: "re-check the same agent", "is it live?". FAQs win.
         return Intent("prehire" if wants_prehire else "audit", last=ref,
                       hint=name_hint(text),

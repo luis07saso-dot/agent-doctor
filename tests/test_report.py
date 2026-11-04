@@ -48,7 +48,7 @@ def test_header_does_not_repeat_agent_doctor(name):
     lk2 = av.Lookup(query=lk.query, outcome="ok", address=lk.address,
                     profile=dict(lk.profile, name=name), almanac=lk.almanac,
                     almanac_status="ok")
-    first = format_report(lk2, score(lk2)).splitlines()[0]
+    first = format_report(lk2, score(lk2)).splitlines()[0].rstrip()  # FB-3 hard break
     assert first == f"**{name}** (@blank-agent-621)"
 
 
@@ -57,7 +57,7 @@ def test_header_keeps_prefix_for_other_agents():
     lk2 = av.Lookup(query=lk.query, outcome="ok", address=lk.address,
                     profile=dict(lk.profile, name="Weather Bot"), almanac=lk.almanac,
                     almanac_status="ok")
-    first = format_report(lk2, score(lk2)).splitlines()[0]
+    first = format_report(lk2, score(lk2)).splitlines()[0].rstrip()  # FB-3 hard break
     assert first == "**Agent Doctor: Weather Bot** (@blank-agent-621)"
 
 

@@ -102,7 +102,11 @@ def test_how_line_is_a_hard_break_under_its_fix():
     for i, line in enumerate(lines):
         if line.startswith("   How: "):
             assert re.match(r"[123]\. .* pts\)  $", lines[i - 1])
-    assert not any(l.endswith("  ") and not l.endswith("pts)  ") for l in lines)
+    # FB-3: every line followed by another (non-list) line is a hard break, not just fixes.
+    for i, line in enumerate(lines[:-1]):
+        nxt = lines[i + 1]
+        if line.strip() and nxt.strip() and not re.match(r"\d\. ", nxt):
+            assert line.endswith("  "), line
 
 
 def test_offline_agent_does_not_repeat_the_same_how():

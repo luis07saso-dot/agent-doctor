@@ -7,3 +7,12 @@ import pytest
 def _llm_off(monkeypatch):
     monkeypatch.setenv("LLM_FOLLOWUP", "0")
     monkeypatch.delenv("ASI1_API_KEY", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_latest(monkeypatch):
+    """Q18: the per-chat "what was seen last" marker is module state; start each test empty."""
+    from collections import OrderedDict
+
+    from agent import service
+    monkeypatch.setattr(service, "_LATEST", OrderedDict())
