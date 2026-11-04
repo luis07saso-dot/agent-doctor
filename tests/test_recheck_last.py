@@ -346,3 +346,41 @@ def test_handle_survives_restart_and_old_files_load(tmp_path, monkeypatch):
     d = memory.shown_to_dict(guides.LAST.get("c1"))
     d.pop("handle")
     assert memory.shown_from_dict(d).handle == ""  # files written before Q17b
+
+
+# ---------- Q17b Sonnet review round 1 ----------
+
+@pytest.mark.parametrize("text,old", [
+    ("audit my agent before I submit", "need_target"), ("check my agent before hiring", "need_target"),
+    ("can you audit an agent before I use it", "need_target"),
+    ("pre-hire check an agent before I pay", "prehire_need_target"),
+    ("I need to check one before friday", "off_scope"), ("audit agent earlier", "need_target"),
+    ("tell me about the agent we checked", "need_target"),
+])
+def test_review_no_hijack(text, old):
+    i = router.classify(text, SELF, (), True)
+    assert i.last == "" and i.kind == old
+
+
+@pytest.mark.parametrize("text", ["is the agent from before live?", "re-check that one above",
+                                  "audit the agent from earlier"])
+def test_from_before_still_works(text):
+    assert router.classify(text, SELF, (), True).last == "any"
+
+
+@pytest.mark.parametrize("text", ["re-check the same old agent", "recheck the slow agent",
+                                  "audit that broken agent", "check the same old agent"])
+def test_describing_words_are_not_names(text):
+    assert router.classify(text, SELF, (), True).hint == ()
+    audit_addr(TAVILY)
+    c = Named()
+    assert say(text, c).outcome == "ok" and c.asked == [TAVILY]
+
+
+def test_possessive_name_hint():
+    assert router.classify("re-check that Tavily's agent", SELF, (), True).hint == ("tavily",)
+
+
+def test_hint_whole_word_or_prefix_only():
+    assert not router.hint_matches(("test",), "Latest News")
+    assert router.hint_matches(("tavily",), "TavilySearch")

@@ -321,7 +321,7 @@ RECHECK_NONE = (
 # chat of this sender. Weak ("audit it", "is that agent live?"): only this chat's last audit.
 # Up to 3 describing words before the noun: "that same tavily agent", "the weather bot".
 _MID = (r"(?:(?!(?:for|of|in|on|to|with|from|and|or|by|at|about|is|are|was|were|we|you|i)\b)"
-        r"[a-z0-9][\w.-]*\s+){0,3}?")
+        r"[a-z0-9][\w.'’-]*\s+){0,3}?")
 _NOUN = r"(?:agent|one|bot)"
 _BACK_STRONG = re.compile(
     r"\bre-?(?:check|audit|scan|run|test|score)(?:s|ed|ing)?\b"
@@ -332,7 +332,9 @@ _BACK_STRONG = re.compile(
     r"|\b(?:that|this|the)\s+" + _MID + _NOUN + r"\s+(?:(?:that|which)\s+)?(?:we|you|i)\s+"
     r"(?:(?:were|was|have|had|'ve|just)\s+){0,2}(?:audit|check|talk|discuss|look|review|scor|"
     r"test|scan)\w*"
-    r"|\b" + _NOUN + r"\s+(?:from\s+)?(?:before|earlier|above)\b", re.IGNORECASE)
+    # "the agent from before", "that one above" (clause end): not "audit my agent before I submit"
+    r"|\b(?:that|this|the)\s+" + _MID + _NOUN + r"\s+(?:from\s+(?:before|earlier|above)\b|"
+    r"(?:before|earlier|above)\W*$)", re.IGNORECASE)
 _AGAIN = re.compile(r"\bagain\b|\bone more time\b|\bonce more\b", re.IGNORECASE)
 _BACK_WEAK = re.compile(r"\bit\b|\b(?:that|this|the)\s+" + _MID + _NOUN + r"\b", re.IGNORECASE)
 # Narrow on purpose: "how do I fix it / test it / do it" are questions, not re-checks.
@@ -345,7 +347,12 @@ _VERB_ON_REF = re.compile(r"\b(?:audit|check|scan|score|analy[sz]e)\s+(?:it|(?:t
 _HINT = re.compile(r"\b(?:same|that|this|the|last|previous|prior|earlier)\s+(" + _MID + r")"
                    + _NOUN + r"\b", re.IGNORECASE)
 _HINT_SKIP = frozenset({"same", "that", "this", "the", "last", "previous", "prior", "earlier",
-                        "very", "exact", "a", "an", "ai", "my", "your", "our", "s"})
+                        "very", "exact", "a", "an", "ai", "my", "your", "our", "s",
+                        # describing words, not names: "the same old agent", "that broken agent"
+                        "old", "slow", "broken", "bad", "good", "working", "live", "dead",
+                        "offline", "online", "flagged", "unresponsive", "current", "original",
+                        "little", "big", "cool", "nice", "great", "weird", "mentioned",
+                        "above", "earlier", "audited", "checked", "one"})
 _OTHER = frozenset({"other", "another", "different", "new", "next", "first", "second", "third"})
 
 
@@ -364,10 +371,10 @@ def hint_matches(hint: Iterable[str], name: str, handle: str = "") -> bool:
     hint = tuple(hint)
     if not hint:
         return True
-    hay = f"{name} {handle}".lower()
-    tokens = set(re.findall(r"[a-z0-9]+", hay))
-    compact = re.sub(r"[^a-z0-9]+", "", hay)
-    return any(w in tokens or (len(w) >= 4 and w in compact) for w in hint)
+    tokens = set(re.findall(r"[a-z0-9]+", f"{name} {handle}".lower()))
+    # Whole word, or the start of one ("tavily" in "TavilySearch"); "test" never in "latest".
+    return any(w in tokens or (len(w) >= 4 and any(t.startswith(w) for t in tokens))
+               for w in hint)
 
 
 def last_mismatch(name: str, prehire: bool) -> str:
@@ -382,7 +389,7 @@ _NOT_RECHECK = re.compile(
     r"(?:how|what|whats|when|why|where|which|who|does|did|do i|can i|could i|should i|"
     r"is there|are there)\b"
     r"|\b(?:delete|forget|erase|wipe|remove|clear|explain|don't|dont|do not|no need|never ?mind|"
-    r"stop|i'll|i will|i'm going to|im going to|let me|later)\b"
+    r"stop|i'll|i will|i'm going to|im going to|let me|later|tell me (?:about|more))\b"
     r"|\b(?:it|this|that) out\b", re.IGNORECASE)
 _RE_VERB = re.compile(r"\bre-?(?:check|audit|scan|run|test|score|do)\w*", re.IGNORECASE)
 # Guards apply per clause: "remove the bad keyword and re-check" is still a re-check.
