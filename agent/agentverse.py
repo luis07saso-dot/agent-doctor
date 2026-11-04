@@ -18,6 +18,8 @@ import time
 from dataclasses import dataclass, field, replace
 from typing import Any, Awaitable, Callable, Literal
 
+from agent.rubric import CHAT_PROTOCOL_DIGEST
+
 BASE_URL = "https://agentverse.ai/v1"
 CALL_TIMEOUT_S = 4.0
 TOTAL_BUDGET_S = 12.0
@@ -38,6 +40,12 @@ SEARCH_CACHE_TTL_S = 300.0
 SEARCH_CACHE_MAX = 256
 SEARCH_CONCURRENCY = 6
 SEARCH_SOURCE = "agent-doctor-findability"  # labels our traffic (OpenAPI `source` field)
+# Q13 Agent Scout: keyword search (default mode) with filters. state active+responsive is AND
+# (live 2026-11-04); protocol_digest keeps only Chat Protocol agents. Spec q13-agent-scout.md.
+SCOUT_SOURCE = "agent-doctor-scout"
+SCOUT_LIMIT = 10
+SCOUT_CACHE_TTL_S = 300.0
+SCOUT_CACHE_MAX = 128  # hits carry READMEs: smaller than the address-only search cache
 
 Status = Literal["ok", "not_found", "timeout", "api_down"]
 Outcome = Literal["ok", "partial", "not_found", "timeout", "api_down", "invalid"]
@@ -109,6 +117,9 @@ class AgentverseClient:
         self._search_cache: dict[str, tuple[float, tuple[str, ...]]] = {}
         self._search_inflight: dict[str, asyncio.Task] = {}
         self._search_sem: asyncio.Semaphore | None = None
+        # Q13: own cache (phrase -> hits) and in-flight tasks, same pattern as Q12.
+        self._scout_cache: dict[str, tuple[float, tuple[dict, ...]]] = {}
+        self._scout_inflight: dict[str, asyncio.Task] = {}
 
     # ---------- public API ----------
 
@@ -204,6 +215,53 @@ class AgentverseClient:
             self._search_cache.pop(next(iter(self._search_cache)))
         self._search_cache[key] = (self._clock() + SEARCH_CACHE_TTL_S, addrs)
         return "ok", addrs
+
+    async def scout_search(self, phrase: str) -> tuple[str, tuple[dict, ...]]:
+        """Q13: (status, hits) for "find an agent that ...": active, responsive agents with the
+        Chat Protocol, keyword mode, top SCOUT_LIMIT in rank order. A hit is the same record as
+        the profile endpoint (live 2026-11-04). status ok | timeout | api_down. Own 8 s timeout;
+        callers only cap their wait. Never raises."""
+        key = re.sub(r"\s+", " ", (phrase or "").strip().lower())
+        try:
+            hit = self._scout_cache.get(key)
+            if hit is not None:
+                if self._clock() < hit[0]:
+                    return "ok", hit[1]
+                self._scout_cache.pop(key, None)
+            task = self._scout_inflight.get(key)
+            if task is None:
+                task = asyncio.ensure_future(self._scout(key))
+                self._scout_inflight[key] = task
+
+                def _done(t: asyncio.Task, key: str = key) -> None:
+                    self._scout_inflight.pop(key, None)
+                    if not t.cancelled():
+                        t.exception()
+                task.add_done_callback(_done)
+            return await asyncio.shield(task)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return "api_down", ()
+
+    async def _scout(self, key: str) -> tuple[str, tuple[dict, ...]]:
+        if self._search_sem is None:
+            self._search_sem = asyncio.Semaphore(SEARCH_CONCURRENCY)
+        body = {"search_text": key, "limit": SCOUT_LIMIT, "offset": 0, "source": SCOUT_SOURCE,
+                "filters": {"state": ["active", "responsive"],
+                            "protocol_digest": [f"proto:{CHAT_PROTOCOL_DIGEST}"]}}
+        async with self._search_sem:
+            src = await self._call("POST", f"{BASE_URL}/search/agents", body, float("inf"),
+                                   timeout=SEARCH_TIMEOUT_S)
+        if src.status != "ok":
+            return ("timeout" if src.status == "timeout" else "api_down"), ()
+        hits = tuple(a for a in (src.data or {}).get("agents") or []
+                     if isinstance(a, dict) and is_address(str(a.get("address") or "")))
+        hits = hits[:SCOUT_LIMIT]
+        if len(self._scout_cache) >= SCOUT_CACHE_MAX:
+            self._scout_cache.pop(next(iter(self._scout_cache)))
+        self._scout_cache[key] = (self._clock() + SCOUT_CACHE_TTL_S, hits)
+        return "ok", hits
 
     async def aclose(self) -> None:
         if self._session is not None:

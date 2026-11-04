@@ -142,17 +142,23 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
 
         common = dict(prehire=run_prehire, probe=lambda address: PROBER.probe(ctx, address),
                       chat_key=hash_id(f"{sender}|{_session(ctx)}"), sender_key=hash_id(sender))
+        deadline = started + service.REPLY_BUDGET_S
         sel = cards.parse_selection(text)  # Q4: a click on an audit card?
         if sel is not None:
             res = await service.handle_card(sel, CLIENT, SELF_HANDLES, SELF_ADDRESSES, **common)
         else:
-            res = await service.handle(text, CLIENT, SELF_HANDLES, SELF_ADDRESSES, **common)
+            res = await service.handle(text, CLIENT, SELF_HANDLES, SELF_ADDRESSES, **common,
+                                       deadline=deadline)
         await _reply(ctx, sender, res.text, res.card)
         extra = {"live": res.live} if res.live else {}
         if sel is not None:
             extra["click"] = sel.action
         if res.card:
             extra["card"] = True
+        if res.scout_hits >= 0:  # Q13: counts only, never the search phrase
+            extra["scout_hits"] = res.scout_hits
+            if res.scout_live:
+                extra["scout_live"] = res.scout_live
         if res.find:  # Q12: counts only, never the phrases
             extra["find"] = res.find
             extra["find_top50"] = res.find_top50

@@ -23,6 +23,8 @@ HELP = (
     "(no need to paste the address again). Free.\n\n"
     "Before you rely on an agent, ask `is weather-bot live?` or `pre-hire check agent1q...`: "
     "I send it one test message and tell you if it really answers.\n\n"
+    "Looking for an agent? Ask `find an agent that books flights`: I search Agentverse, score "
+    "the top 5, test the best 2 and pick one.\n\n"
     "Ask `why this score?` to see the data behind each check. "
     "Send `forget` to delete what I stored for you."
 )
@@ -36,7 +38,8 @@ OFF_SCOPE = (
 NEED_TARGET = (
     "Which agent? I need its address (`agent1q...`), handle (`audit weather-bot`, no @) "
     "or Agentverse profile link. I can't search by name yet.\n\n"
-    "Find it on agentverse.ai: open the agent, copy the address, handle or profile link."
+    "Find it on agentverse.ai: open the agent, copy the address, handle or profile link.\n\n"
+    "Looking for an agent that does something? Ask `find an agent that books flights`."
 )
 
 BAD_ADDRESS = (
@@ -256,7 +259,7 @@ _GREETING = re.compile(r"^\W*(hi|hello|hey|help|start|menu|commands?|usage|what 
 
 Kind = Literal["audit", "prehire", "help", "need_target", "prehire_need_target", "bad_address",
                "off_scope", "fix_guide", "faq", "explain", "explain_none", "forget",
-               "recheck_none"]
+               "recheck_none", "scout", "scout_need_what", "scout_pick_none"]
 
 # Q15: "forget me" / "delete my data". A verb needs a data noun ("delete this" is not enough),
 # except "forget" on its own. Whole message only, so "forget it, audit X" is not one.
@@ -422,6 +425,107 @@ def back_ref(text: str, wants_prehire: bool, has_audit: bool) -> str:
     return found
 
 
+# ---------- Q13 Agent Scout: "find me an agent that books flights" ----------
+SCOUT_NEED_WHAT = ("What should the agent do? e.g. `find an agent that books flights` or "
+                   "`is there an agent for crypto prices?`")
+SCOUT_PICK_NONE = ("I don't have a recent agent search in this chat. Ask `find an agent that …` "
+                   "first, e.g. `find an agent that books flights`.")
+
+
+def scout_pick_short(n: int, count: int) -> str:
+    s = "" if count == 1 else "s"
+    return (f"I listed only {count} agent{s} in my last search, so there's no #{n}. "
+            f"Try `audit #1`.")
+
+
+_LEAD = (r"\b(?:find|search(?:\s+for)?|look(?:ing)?\s+for|need|want|recommend|suggest|"
+         r"show\s+me|get\s+me|is\s+there|are\s+there|any|which|what|best|top|know(?:\s+of)?)\b")
+_FILL = r"(?:me|us|a|an|some|any|the|one|good|great|best|top|reliable|ai|really|other|new|free)"
+_SNOUN = r"(?:agents?|bots?)\b"
+_VIA = (r"(?:\s+(?:should\s+i\s+(?:use|hire|pick)|do\s+you\s+recommend|would\s+you\s+recommend|"
+        r"can\s+i\s+use|could\s+i\s+use|is\s+best|is\s+good|works\s+best))?")
+_CONN = (r"(?:that|which|who|to|for|capable\s+of|able\s+to|good\s+at|"
+         r"(?:can|could)(?!\s+(?:you|u|i|we|doctor|it)\b))")
+_SCOUT_A = re.compile(_LEAD + r"(?:\s+" + _FILL + r"){0,3}\s+" + _SNOUN + _VIA + r"\s+" + _CONN
+                      + r"\s+(?P<cap>.+)", re.IGNORECASE | re.DOTALL)
+# Form B ("find me a weather agent") only after a request lead: "what is the number 1 agent"
+# is a question, not a search.
+_LEAD_B = (r"\b(?:find|search(?:\s+for)?|look(?:ing)?\s+for|need|want|recommend|suggest|"
+           r"show\s+me|get\s+me|is\s+there|are\s+there|any|know\s+of)\b")
+_SCOUT_B = re.compile(_LEAD_B + r"(?:\s+" + _FILL + r"){0,3}\s+(?P<cap>(?:(?!(?:my|our|your|this|that|is|are|was|were)\b)"
+                      r"[\w'-]+\s+){1,4}?)" + _SNOUN + r"\s*(?:on\s+agentverse|please|pls)?\s*"
+                      r"(?:[?.!,;:]|$)", re.IGNORECASE)
+_CAP_CUT = re.compile(r"[?!\n]|\.(?:\s|$)")
+_CAP_TAIL = re.compile(r"(?:\s+(?:please|pls|thanks|thank\s+you|for\s+me|on\s+agentverse|"
+                       r"on\s+asi:?\s?one|in\s+agentverse))+\s*$", re.IGNORECASE)
+_CAP_HEAD = re.compile(r"^(?:(?:can|could|will|does|do|is\s+able\s+to|helps?(?:\s+me)?(?:\s+to)?|"
+                       r"use\s+(?:to|for))\s+)+", re.IGNORECASE)
+_STOP = frozenset("a an the to of for me my i you your some any that which who can could will "
+                  "would please with and or in on at from by is are be it this do does help "
+                  "helps us we if whether".split())
+_VAGUE = frozenset("good great best better top new nice cool smart ai real reliable working "
+                   "live fast".split())
+_CAP_RANK = re.compile(r"\b(?:rank\w*|found|discover\w*|visib\w*|picked|appear\w*)\b", re.I)
+_CAP_AUDIT = re.compile(r"^(?:audit|scan|score|re-?check)\w*\b", re.I)
+SCOUT_MAX_WORDS = 6
+# An audit / Pre-Hire verb before the lead word means the message is about checking an agent.
+_SCOUT_PREFIX_BAD = re.compile(r"\b(?:audit|scan|review|score|rate|fix|improve|analy[sz]e|"
+                               r"pre-?hire|probe|ping|re-?check)\w*|\bcheck\w*", re.IGNORECASE)
+
+
+def _capability(raw: str) -> Optional[str]:
+    """Search phrase from the words after "an agent that ...". "" = nothing usable,
+    None = this is not a scout request after all (ranking or audit wording)."""
+    cap = _CAP_CUT.split(raw, maxsplit=1)[0]
+    cap = _CAP_TAIL.sub("", cap.strip())
+    cap = _CAP_HEAD.sub("", cap.strip())
+    from agent.report import clean  # local: report imports nothing from router at load time
+    cap = re.sub(r"\s+", " ", clean(cap, 120)).strip(" .,!?:;-'\"`").lower()
+    if _CAP_RANK.search(cap) or _CAP_AUDIT.search(cap):
+        return None
+    if cap and " " not in cap and not cap.isascii():  # CJK etc.: one "word"
+        return cap if 2 <= len(cap) <= 60 else ""
+    words = [w.strip(".,!?:;'\"`") for w in cap.split(" ")]
+    words = [w for w in words if w and w not in _STOP and w not in _VAGUE]
+    return " ".join(words[:SCOUT_MAX_WORDS])
+
+
+def scout_query(text: str) -> Optional[str]:
+    """Q13: the search phrase of "find me an agent that books flights", "" if the request has
+    no usable capability ("find me an agent"), None if this isn't a scout request."""
+    t = text or ""
+    for rx in (_SCOUT_A, _SCOUT_B):
+        m = rx.search(t)
+        if m:
+            if _SCOUT_PREFIX_BAD.search(t[:m.start()]):
+                return None  # "audit any agent for me", "I want to check which agent..."
+            return _capability(m.group("cap"))
+    if re.search(r"\b(?:find|recommend|suggest)\s+(?:me\s+)?(?:an?\s+|some\s+)?(?:good\s+)?"
+                 + _SNOUN + r"\s*(?:on\s+agentverse)?\s*[?.!]*\s*$", t, re.I):
+        return ""  # "find me an agent": a scout request without the what
+    return None
+
+
+_PICK_N = re.compile(r"(?<![\w&])#\s*([1-5])(?!\d)")
+_PICK_MINE = re.compile(r"\b(?:my|our|your)\s+(?:\w+\s+)?(?:agents?|bots?)\b", re.IGNORECASE)
+_PICK_HIRE = re.compile(r"\b(?:hire|test|live|alive|online|responding|reachable)\w*", re.IGNORECASE)
+_PICK_AUDIT = re.compile(r"\b(?:audit|check|scan|review|score|analy[sz]e|re-?check)\w*",
+                         re.IGNORECASE)
+
+
+def scout_pick(text: str) -> Optional[Intent]:
+    """Q13: "audit #2" / "is #1 live?" about this chat's last scout list."""
+    m = _PICK_N.search(text)
+    if not m or _PICK_MINE.search(text):
+        return None
+    n = int(m.group(1))
+    if _PREHIRE.search(text) or _LIVE_Q.search(text) or _PICK_HIRE.search(text):
+        return Intent("prehire", pick=n)
+    if _PICK_AUDIT.search(text):
+        return Intent("audit", pick=n)
+    return None
+
+
 @dataclass(frozen=True)
 class Intent:
     kind: Kind
@@ -436,11 +540,15 @@ class Intent:
     # "chat": this chat only). None remembered -> `fallback`.
     last: str = ""
     hint: tuple[str, ...] = ()  # Q17b: words naming the agent meant ("tavily")
+    query: str = ""  # Q13 scout: the search phrase
+    pick: int = 0  # Q13: "audit #2" = agent #2 of this chat's last scout list (1-based)
 
 
 def classify(text: str, self_handles: Iterable[str] = (),
-             self_addresses: Iterable[str] = (), has_audit: bool = False) -> Intent:
-    """`has_audit`: this chat has a remembered audit, so a bare "#2" means fix #2."""
+             self_addresses: Iterable[str] = (), has_audit: bool = False,
+             has_scout: bool = False) -> Intent:
+    """`has_audit`: this chat has a remembered audit, so a bare "#2" means fix #2.
+    `has_scout` (Q13): this chat has a scout list, so "audit #2" means agent #2 of it."""
     text = (text or "").strip()
     self_addresses = tuple(a for a in self_addresses if a)
     ex = extract(text, ignore_handles=self_handles, ignore_addresses=self_addresses)
@@ -462,6 +570,13 @@ def classify(text: str, self_handles: Iterable[str] = (),
     n = fix_number(text, has_audit)
     if n:
         return Intent("fix_guide", n=n)
+    if has_scout:
+        p = scout_pick(text)
+        if p is not None:
+            return p
+    q = scout_query(text)
+    if q is not None:  # Q13: "find me an agent that books flights"
+        return Intent("scout", query=q) if q else Intent("scout_need_what")
     explain = explain_wanted(text)
     key = faq_key(text)
     base = _no_target(text)
@@ -515,6 +630,8 @@ def reply_for(kind: Kind) -> str:
         "off_scope": OFF_SCOPE,
         "explain_none": EXPLAIN_NONE,
         "recheck_none": RECHECK_NONE,
+        "scout_need_what": SCOUT_NEED_WHAT,
+        "scout_pick_none": SCOUT_PICK_NONE,
     }[kind]
 
 

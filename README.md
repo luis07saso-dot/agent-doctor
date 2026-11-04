@@ -23,6 +23,7 @@ It is built for agent builders asking "why is nobody finding my agent?". Think o
 - **Why this score?**: after an audit, ask `why this score?` to see the data behind each check. A check Agentverse has no data for shows "no data" (0 points), not a failure.
 - **Findability test**: searches Agentverse for up to 3 of the agent's own starter prompts and shows where it ranks in the top 50, so you see whether users typing those words can find it.
 - **Re-check diff**: say `re-check` (or `check it again`) and Agent Doctor audits the last agent again, no need to paste its address. You see the score change since the last check, with what was fixed and what is new.
+- **Agent Scout (find an agent)**: ask `find an agent that books flights`. Agent Doctor searches Agentverse for active, responsive agents with the Chat Protocol, scores the top 5, live-tests the best 2 matches and picks one, with reasons. Then `audit #2` or `is #3 live?`.
 - **`forget`**: send `forget` to delete everything Agent Doctor stored for you.
 
 ## Usage
@@ -114,6 +115,28 @@ Full profile audit: audit agent1q...
 
 Verdicts: **LIVE** (it answered), **DEGRADED** (it acknowledged but sent no answer in time), **UNREACHABLE** (no acknowledgement, no answer). If the agent has not answered by the time Agent Doctor must reply, you get **CHECKING**: ask again a minute later for the verdict.
 
+### Agent Scout: find an agent that does X
+
+Ask for an agent by what it should do. Agent Doctor searches Agentverse (active, responsive agents with the Chat Protocol), scores the top 5 like an audit, sends the 2 best matches one test message each, and picks one.
+
+```text
+find an agent that books flights
+is there an agent for crypto prices?
+```
+
+Example output (shortened):
+
+```text
+Agent Scout: searched Agentverse for "books flights"
+Pick: Flights Agent: answered my test message in 2.1 s. Profile 84/100, rated 4.8, 76,649 chats.
+1. Flights Agent: 84/100 · ✅ answered in 2.1 s · ★4.8 · 76,649 chats
+2. Autonomad Travel: 88/100 · ⏳ still checking · ★4.5 · 1,829 chats
+3. TripPilot AI: 76/100 · not tested · ★2.4 · 38 chats
+Next: audit #2 full report · is #3 live? Pre-Hire Check
+```
+
+The list follows Agentverse search order. Between agents that answered, the higher profile score wins.
+
 ### For agents: Pre-Hire Check protocol
 
 Orchestrators and routers can ask Agent Doctor before they hire (call) another agent. Protocol `AgentDoctorPreHire` 0.1.0: send `PreHireRequest{address}`, get back `PreHireResult{status, live, ack_ms, reply_ms, chat_protocol, active, unresponsive_flag, rating, trust_score, checked_at, cached, detail, profile_url}`.
@@ -177,7 +200,7 @@ Every chat message goes through the same steps. Agent Doctor acknowledges it fir
 
 ```text
 your message
-  → router: audit · Pre-Hire Check · fix guide · why this score? · forget · quick answer
+  → router: audit · Pre-Hire Check · Agent Scout · fix guide · why this score? · forget · quick answer
   → Agentverse lookup: public profile + Almanac record (cached 5 min)
   → scorer: rule-based checks against the Agentverse ranking factors
   → at the same time:
@@ -187,10 +210,12 @@ your message
   → report: score, verdict, top 3 fixes with How: lines
 ```
 
+Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 → audit score each (an agent the Almanac shows offline is dropped) → live test of the first 2 → pick.
+
 - **Rules decide, no AI model.** The score, the fixes and every answer come from fixed rules, so the same agent always gets the same score. No LLM reads your messages.
 - **Agents hiring agents.** Agent Doctor speaks the Agent Chat Protocol and its own `AgentDoctorPreHire` protocol. For a live test it messages the other agent over Agentverse, like any agent would, and times the reply.
 - **Data used**: public Agentverse endpoints only (agent search, agent profile, Almanac registration and handles). No private data, no logins.
-- **Privacy**: logs keep no message text, and sender IDs are hashed. To power fix guides, `why this score?` and the re-check diff, Agent Doctor stores the last audit shown in a chat (24 hours) and the last score and pass/fail of each check per agent you checked (30 days, up to 20 agents). Keys are hashed; only public agent data (name, address, score, check results) is kept. Send `forget` to delete it.
+- **Privacy**: logs keep no message text, and sender IDs are hashed. Agent Scout sends your search words (not your message) to Agentverse search and keeps the last list per chat for 24 hours in memory, so `audit #2` works. To power fix guides, `why this score?` and the re-check diff, Agent Doctor stores the last audit shown in a chat (24 hours) and the last score and pass/fail of each check per agent you checked (30 days, up to 20 agents). Keys are hashed; only public agent data (name, address, score, check results) is kept. Send `forget` to delete it.
 - **Reliability**: an error gets a short "try again" reply, never silence or a crash. Rate limits and a loop guard stop runaway agent-to-agent loops (a conversation that keeps flooding is paused for 24 hours). Runs 24/7 on a dedicated server with a watchdog and one-step rollback.
 - **Tested**: 795 automated tests, plus live checks on ASI:One.
 
@@ -200,6 +225,7 @@ your message
 - **Agents with no traffic**: wondering "why is my agent not getting interactions?" Send its address or handle to see why it gets no impressions or picks, and improve agent discoverability.
 - **Agent not responding?** Ask `is my-weather-bot live?` (or just "my-weather-bot not responding"). One test message tells you LIVE, DEGRADED or UNREACHABLE, so you know whether to fix it or hire another agent.
 - **Hackathon teams**: check the profile meets the Agentverse ranking basics before judging.
+- **Hiring an agent**: ask Agent Scout for an agent by what it should do and get one that answered a live test, not just the first search hit.
 - **Agencies and teams with many agents**: get a quick, consistent score for each one.
 - **After every profile edit**: re-check to confirm the change landed (Agentverse can take a few minutes to update).
 
@@ -215,7 +241,8 @@ your message
 - **Keywords are not checked yet.** Make sure each keyword appears in your README.
 - **Mainnet only.** Testnet agents are not checked.
 - **One agent per message.** Only the first agent in a message is audited.
-- **No search by name.** Use the address, @handle or profile link.
+- **No search by name.** Use the address, @handle or profile link. Agent Scout searches by what an agent does, not by its name.
+- **Agent Scout tests at most 2 agents per search.** The others show "not tested": ask `is #3 live?`. The profile score is not answer quality. Results depend on Agentverse keyword search; few or exact words work best. Live tests pause for a while after many searches in a short time.
 - **@handles in ASI:One**: mentioning another agent's @handle may route the message to that agent. Type the handle without @ (works for handles with a hyphen, like `my-weather-bot`, anywhere in the message), or use the address or profile link. A hyphenless handle needs the @ or the address. If a hyphenated word isn't a known handle, Agent Doctor answers the rest of the message instead.
 - **Text only.** Images and files are not read.
 - Results are cached for 5 minutes, and Agentverse itself can take a while to show profile changes.
@@ -230,6 +257,6 @@ your message
 - **Data sources**: public Agentverse search and Almanac APIs
 - **Privacy**: logs keep no message text; sender IDs are hashed; `forget` deletes stored audits
 - **Price**: free
-- **Version**: 0.10.3
+- **Version**: 0.11.0
 - **Maintainer**: [leedr.tech](https://leedr.tech)
 - **Built for**: Stranger Builds hackathon, Fetch.ai track

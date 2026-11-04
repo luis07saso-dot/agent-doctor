@@ -16,7 +16,7 @@ import time
 from dataclasses import dataclass, replace
 from typing import Any, Awaitable, Callable, Iterable, Optional, Protocol
 
-from agent import cards, evidence, findability, guides, recheck, router
+from agent import cards, evidence, findability, guides, recheck, router, scout
 from agent.agentverse import Lookup
 from agent.extract import Target
 from agent.report import PROFILE_URL, TOP_FIXES, clean, fit, format_report
@@ -68,18 +68,21 @@ class Result:
     card: Optional[dict] = None  # Q4: MetadataContent.metadata of an ASI:One card, audits only
     find: str = ""  # Q12: "<checked>/<phrases>" when the findability test ran
     find_top50: int = -1  # Q12: phrases where the agent was in the top 50
+    scout_hits: int = -1  # Q13: agents listed by a scout reply
+    scout_live: str = ""  # Q13: "<answered>/<probed>" when live tests ran
 
 
 async def handle(text: str, client: LookupClient, self_handles: Iterable[str] = (),
                  self_addresses: Iterable[str] = (), prehire: Optional[PreHireFn] = None,
                  probe: Optional[ProbeFn] = None, chat_key: str = "",
-                 sender_key: str = "") -> Result:
+                 sender_key: str = "", deadline: Optional[float] = None) -> Result:
     """`chat_key` identifies one chat (hashed sender + session). An audit remembers its top
     fixes under it, so a later "how do I fix #2" in the same chat gets that fix's guide.
-    `sender_key` (hashed sender, Q15) keys the re-check diff and `forget`."""
+    `sender_key` (hashed sender, Q15) keys the re-check diff and `forget`.
+    `deadline` (Q13): monotonic time the reply must go out by (chat.py: arrival + budget)."""
     try:
         return await _handle(text, client, self_handles, self_addresses, prehire, probe, chat_key,
-                             sender_key)
+                             sender_key, deadline)
     except Exception:  # last line of defence: the caller still gets a reply
         return Result(router.FALLBACK, "fallback", "none")
 
@@ -87,10 +90,26 @@ async def handle(text: str, client: LookupClient, self_handles: Iterable[str] = 
 async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
                   self_addresses: Iterable[str] = (), prehire: Optional[PreHireFn] = None,
                   probe: Optional[ProbeFn] = None, chat_key: str = "",
-                  sender_key: str = "") -> Result:
+                  sender_key: str = "", deadline: Optional[float] = None) -> Result:
     started = time.monotonic()
     has_audit = guides.LAST.get(chat_key) is not None
-    intent = router.classify(text, self_handles, self_addresses, has_audit)
+    listed = scout.LISTS.get(chat_key)
+    intent = router.classify(text, self_handles, self_addresses, has_audit, listed is not None)
+    if intent.kind == "scout":
+        return await _scout(intent.query, client, probe, self_handles, self_addresses, chat_key,
+                            sender_key, deadline if deadline is not None
+                            else started + REPLY_BUDGET_S)
+    if intent.kind in ("scout_need_what", "scout_pick_none"):
+        text_, outcome = router.reply(intent)
+        return Result(text_, outcome, "none")
+    via_pick = intent.pick > 0
+    if via_pick:  # Q13: "audit #2" = agent #2 of this chat's last scout list
+        if not listed:
+            return Result(router.SCOUT_PICK_NONE, "scout_pick_none", "pick")
+        if intent.pick > len(listed):
+            return Result(router.scout_pick_short(intent.pick, len(listed)), "scout_pick_none",
+                          "pick")
+        intent = replace(intent, targets=(Target("address", listed[intent.pick - 1][0]),), pick=0)
     via_last = bool(intent.last)
     if via_last:  # Q17: "re-check the same agent" -> the remembered agent's address
         shown, other = _remembered(chat_key, sender_key, intent.last == "any", intent.hint)
@@ -106,6 +125,7 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         return _fix_guide(intent.n, chat_key)
     if intent.kind == "forget":
         ok = await guides.LAST.memory.forget(diff_key(sender_key, chat_key), chat_key, sender_key)
+        scout.LISTS.drop_sender(sender_key, chat_key)
         return Result(router.FORGET_DONE if ok else router.FORGET_ERROR,
                       "forget" if ok else "forget_error", "none")
     if intent.kind == "explain" and not intent.targets:
@@ -125,7 +145,7 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         return Result(text_, outcome, "soft_miss")
 
     target: Target = intent.targets[0]
-    itype = "last" if via_last else target.kind  # log input type
+    itype = "last" if via_last else "pick" if via_pick else target.kind  # log input type
     n = len(intent.targets)
     footer = router.more_targets(n - 1) if n > 1 else ""
 
@@ -191,6 +211,23 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
     }.get(lk.outcome, router.FALLBACK)
     outcome = lk.outcome if lk.outcome in ("not_found", "invalid", "api_down", "timeout") else "fallback"
     return err(reply, outcome)
+
+
+async def _scout(phrase: str, client: Any, probe: Optional[ProbeFn], self_handles: Iterable[str],
+                 self_addresses: Iterable[str], chat_key: str, sender_key: str,
+                 deadline: float) -> Result:
+    """Q13 Agent Scout. Belt: never waits past REPLY_BUDGET_S + 2 whatever happens inside."""
+    try:
+        res = await asyncio.wait_for(
+            scout.run(phrase, client, probe, deadline, tuple(self_addresses), tuple(self_handles),
+                      sender_key), REPLY_BUDGET_S + 2.0)
+    except asyncio.TimeoutError:
+        res = scout.ScoutResult("timeout", phrase)
+    if res.cands:
+        scout.LISTS.put(chat_key, sender_key, scout.items(res))
+    return Result(scout.format_reply(res), f"scout_{res.status}", "none",
+                  scout_hits=len(res.cands),
+                  scout_live=f"{res.live}/{res.probed}" if res.probed else "")
 
 
 def diff_key(sender_key: str, chat_key: str) -> str:
