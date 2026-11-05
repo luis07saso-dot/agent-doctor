@@ -76,7 +76,8 @@ SYSTEM = (
     "agent. Do not answer it. Choose values from the lists only.\n"
     "ask: \"explain\" = why / what / how much / how is it measured; \"fix\" = how to fix, "
     "improve, add or change it; \"other\" = not a question about the audited agent or its "
-    "audit.\n"
+    "audit (also: rules, bans, terms of service, faking or buying traffic, pricing, or any "
+    "general question that only mentions chats, users or ratings in passing).\n"
     "check: the audit check the message is about, or \"none\":\n"
     + "\n".join(f"- {k}: {v}" for k, v in _CHECK_HELP.items())
     + "\ntopic: a data question, or \"none\":\n"

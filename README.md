@@ -47,7 +47,7 @@ how is the score calculated?
 how can I rank higher on ASI:One?
 ```
 
-Quick answers, no agent needed: how the score works, what Agent Doctor checks, how to rank higher, and whether it's free.
+Quick answers, no agent needed: how the score works, what Agent Doctor checks, how to rank higher, whether it's free, and whether faking chats or traffic can get your agent banned (it can: Fetch.ai's Terms of Service).
 
 Example output:
 
@@ -259,6 +259,6 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **Data sources**: public Agentverse search and Almanac APIs
 - **Privacy**: logs keep no message text; sender IDs are hashed; `forget` deletes stored audits
 - **Price**: free
-- **Version**: 0.11.1
+- **Version**: 0.11.2
 - **Maintainer**: [leedr.tech](https://leedr.tech)
 - **Built for**: Stranger Builds hackathon, Fetch.ai track
