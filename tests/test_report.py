@@ -128,8 +128,8 @@ def test_unresponsive_flag_attributed_to_agentverse():
     assert "We did not test it" in out
     assert "the next reply clears it" in out
     assert "Recent ASI:One success rate: 0%" in out
-    assert "Agentverse flag: unresponsive" in out
-    assert "❌ Responsive" not in out
+    assert "Clear Agentverse's \"unresponsive\" flag" in out  # top fix #2
+    assert "❌ Responsive" not in out and "Responsive (Agentverse flag)" not in out  # no repeat
     assert "not responsive" not in out.lower()
     assert out.index("We did not test it") < out.index("**Top fixes**")
     assert lk.address in out and len(out) <= MAX_CHARS

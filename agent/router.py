@@ -9,25 +9,16 @@ from agent import concepts
 from agent import rubric as R
 from agent.extract import Target, extract, handle_anchored, soft_handles
 
-HELP = (
+HELP = (  # Q22a (FB-7): <= 600 chars
     "**Agent Doctor** audits any Agentverse agent and tells you how to rank higher "
-    "on Agentverse and ASI:One.\n\n"
-    "Send an agent address, handle or Agentverse profile link, e.g.:\n"
-    "- `audit agent1q...`\n"
-    "- `audit weather-bot` (handle, no @)\n"
-    "- `https://agentverse.ai/agents/details/agent1q.../profile`\n\n"
-    "In ASI:One, leave out the @ before another agent's handle: an @handle may send "
-    "your message to that agent instead.\n\n"
-    "You get a 0-100 score, a verdict and the top 3 fixes (README, Chat Protocol, "
-    "handle, avatar, status, rating, Testing and more), each with how to do it. "
-    "Then ask `how do I fix #1` for step-by-step help, or send `re-check` after changes "
-    "(no need to paste the address again). Free.\n\n"
-    "Before you rely on an agent, ask `is weather-bot live?` or `pre-hire check agent1q...`: "
-    "I send it one test message and tell you if it really answers.\n\n"
-    "Looking for an agent? Ask `find an agent that books flights`: I search Agentverse, score "
-    "the top 5, test the best 2 and pick one.\n\n"
-    "Ask `why this score?` to see the data behind each check. "
-    "Send `forget` to delete what I stored for you."
+    "on Agentverse and ASI:One. Free.\n\n"
+    "Send an address, handle or profile link: `audit agent1q...` or `audit weather-bot`. "
+    "Leave out the @: in ASI:One an @handle may send your message to that agent.\n\n"
+    "You get a 0-100 score and the top 3 fixes. Then ask `how do I fix #1`, "
+    "`why this score?` or `re-check`.\n\n"
+    "Also: `is weather-bot live?` or `pre-hire check agent1q...` (I message it and see if it "
+    "answers), `find an agent that books flights` (I search, score and test the best), "
+    "`forget` (deletes what I stored)."
 )
 
 OFF_SCOPE = (

@@ -83,8 +83,10 @@ def score(lookup: Any) -> Score:
               _success_no_data(profile.get("recent_verified_interactions"))),
         _rate("eval_rate", profile.get("recent_eval_success_rate"),
               "Run Agentverse Testing (Testing tab) with real in-scope questions",
-              "No Testing score from Agentverse yet: run Agentverse Testing with real "
-              "in-scope questions"),
+              # Q21 (FB-6): "No Testing score" read as "test suite not found". Say what we
+              # know: Agentverse's public data shares none; the owner's runs may still exist.
+              "Run Testing with real in-scope questions (Agentverse shares no recent "
+              "Testing result for it)"),
         _website(profile.get("domain")),
         _starter_prompts(profile.get("starter_prompts")),
     ]

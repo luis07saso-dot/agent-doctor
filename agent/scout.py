@@ -79,10 +79,14 @@ def _num(v: Any) -> bool:
 # ---------- caps (SCOPE A2: bounded probing of unnamed agents) ----------
 
 class Caps:
-    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+    def __init__(self, clock: Callable[[], float] = time.monotonic,
+                 per_hour: int = SENDER_PROBED_PER_HOUR, shared: Optional["Caps"] = None) -> None:
+        """Q20a: `shared` = use that Caps' global per-minute window (audit probes and scout
+        probes count against one third-party budget); the per-sender hour stays separate."""
         self._clock = clock
+        self._per_hour = per_hour
         self._senders: OrderedDict[str, deque] = OrderedDict()
-        self._global: deque = deque()
+        self._global: deque = shared._global if shared is not None else deque()
 
     def allow(self, sender_key: str, n: int) -> bool:
         """Record and allow `n` scout probes for this sender, or refuse (no probes at all)."""
@@ -94,7 +98,7 @@ class Caps:
             q = deque()
         while q and now - q[0] >= 3600.0:
             q.popleft()
-        if len(q) >= SENDER_PROBED_PER_HOUR or len(self._global) + n > GLOBAL_PROBES_PER_MIN:
+        if len(q) >= self._per_hour or len(self._global) + n > GLOBAL_PROBES_PER_MIN:
             return False
         q.append(now)
         self._senders[sender_key] = q
@@ -106,6 +110,10 @@ class Caps:
 
 
 CAPS = Caps()
+# Q20a: live test in single-agent audits. Own hourly budget per sender (owners re-check
+# often), same global per-minute budget as Scout (bounds traffic to third-party agents).
+AUDIT_PROBES_PER_HOUR = 12
+AUDIT_CAPS = Caps(per_hour=AUDIT_PROBES_PER_HOUR, shared=CAPS)
 
 
 # ---------- last list per chat (for "audit #2") ----------

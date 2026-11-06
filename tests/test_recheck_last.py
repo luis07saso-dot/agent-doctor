@@ -232,7 +232,7 @@ def test_expired_memory_not_used(monkeypatch):
 
 
 def test_report_tail_advertises_recheck():
-    assert 'Say "re-check" any time after changes.' in audit(Client()).text
+    assert '"re-check" after changes.' in audit(Client()).text
 
 
 def test_help_mentions_recheck():

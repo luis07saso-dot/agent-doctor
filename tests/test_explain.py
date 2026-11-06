@@ -93,10 +93,10 @@ def test_unindexed_has_no_tips():
 # ---------- report ----------
 
 @pytest.mark.parametrize("name", FIXTURES)
-def test_report_keeps_three_hows_and_limit(name):
+def test_report_keeps_one_how_and_limit(name):
     out = format_report(load(name), score(load(name)))
     assert len(out) <= MAX_CHARS
-    assert out.count("How:") == 3
+    assert out.count("How:") == 1  # Q22a: How on fix #1 only
     assert "why this score?" in out
 
 
@@ -119,7 +119,7 @@ def test_report_tip_label_and_legend_only_with_tip():
 
 def test_report_no_data_wording():
     out = format_report(load("strong"), score(load("strong")))
-    assert "ASI:One success: no data" in out and "Testing: no data" in out
+    assert "❔ No data: ASI:One success, Testing (none shared)" in out  # Q21/Q22a
     assert "none yet" not in out
 
 
@@ -175,7 +175,8 @@ def test_explain_success_topic():
 
 def test_explain_rating_and_testing_topics():
     out = evidence.format_explain(_shown(), "what's the rating and testing score?")
-    assert "doesn't publish the formula" in out and "Testing score: no data from Agentverse" in out
+    assert "doesn't publish the formula" in out and "Agentverse shares no recent Testing result" in out
+    assert "your Testing tab may still have runs" in out and "not found" not in out  # Q21
 
 
 @pytest.mark.parametrize("name", FIXTURES)

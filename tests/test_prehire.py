@@ -379,11 +379,19 @@ def test_chat_audit_of_flagged_agent_runs_live_check(chat_wired):
     assert "We did not test it" not in reply and req["live"] == "live"
 
 
-def test_chat_audit_of_unflagged_agent_does_not_probe(monkeypatch, chat_wired):
+def test_chat_audit_of_unflagged_agent_probes_once(monkeypatch, chat_wired):
+    """Q20a: single-agent audits send one test message too (was: flagged agents only)."""
     monkeypatch.setattr(chat, "CLIENT", FakeClient(unresponsive=False))
     (reply,), (req,) = say(f"audit {STRONG}")
-    assert "Score " in reply and req["outcome"] == "ok" and chat_wired.calls == []
-    assert "live" not in req
+    assert "Score " in reply and req["outcome"] == "ok" and len(chat_wired.calls) == 1
+    assert req["live"] == "live" and "✅ Live test: it answered our test message in 3.2s" in reply
+
+
+def test_chat_audit_live_kill_switch(monkeypatch, chat_wired):
+    monkeypatch.setenv("AUDIT_LIVE", "0")
+    monkeypatch.setattr(chat, "CLIENT", FakeClient(unresponsive=False))
+    (reply,), (req,) = say(f"audit {STRONG}")
+    assert "Score " in reply and chat_wired.calls == [] and "live" not in req
 
 
 @pytest.mark.parametrize("status,word", [("live", "LIVE"), ("degraded", "DEGRADED"),

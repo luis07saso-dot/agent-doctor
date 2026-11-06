@@ -17,3 +17,13 @@ def _fresh_latest(monkeypatch):
     from agent import service
     monkeypatch.setattr(service, "_LATEST", OrderedDict())
     monkeypatch.setattr(service, "_LAST_FIX", OrderedDict())
+
+
+@pytest.fixture(autouse=True)
+def _fresh_probe_caps(monkeypatch):
+    """Q20a: audit + scout probe caps are module state; each test starts with fresh budgets."""
+    from agent import scout
+    caps = scout.Caps()
+    monkeypatch.setattr(scout, "CAPS", caps)
+    monkeypatch.setattr(scout, "AUDIT_CAPS", scout.Caps(per_hour=scout.AUDIT_PROBES_PER_HOUR,
+                                                        shared=caps))

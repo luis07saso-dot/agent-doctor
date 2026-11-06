@@ -230,7 +230,7 @@ def test_report_with_diff_and_find_keeps_hows(name):
     prev["total"] = 0
     d = recheck.compare(prev, score(lk), 1_000_000.0 + 3600)
     out = format_report(lk, score(lk), diff=d, find=WORST)
-    assert len(out) <= MAX_CHARS and out.count("How:") == 3 and "Since the last check" in out
+    assert len(out) <= MAX_CHARS and out.count("How:") == 1 and "Since the last check" in out
 
 
 # ---------- service ----------

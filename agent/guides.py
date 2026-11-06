@@ -225,7 +225,9 @@ _GUIDES: dict[str, tuple[str, list[str], str]] = {  # rule -> (why, steps, examp
          "Check the Growth tab after changes."],
         ""),
     "eval_rate": (
-        "Successful Agentverse evaluations (Testing runs) feed your rating.",
+        "Successful Agentverse evaluations (Testing runs) feed your rating. Already ran "
+        "some? Agentverse doesn't say when runs show in its public data, so a score here "
+        "can lag.",
         ["Testing tab → Questions: Generate a set, add your own, or upload a CSV.",
          "Run them, then open the Runs tab.",
          "Fix each failure by its reason (Readme mismatch, Poor response quality, "

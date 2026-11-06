@@ -179,9 +179,8 @@ WORST = F.Find(items=(("How do I improve my agent's ranking on ASI:One", "ok", N
 def test_report_with_block_keeps_hows(name):
     lk = load(name)
     out = format_report(lk, score(lk), find=WORST)
-    assert len(out) <= MAX_CHARS and out.count("How:") == 3
-    if name != "flagged":  # flag note + 3 hows leave no room: hows win (Q12 spec, FB-3 breaks)
-        assert "🔍 Agentverse search" in out  # full or counts-only level
+    assert len(out) <= MAX_CHARS and out.count("How:") == 1  # Q22a: How on #1 only
+    assert "🔍 Agentverse search" in out  # Q22a: shorter report leaves room for it
     assert out.rstrip().endswith(")")  # profile link still last
 
 

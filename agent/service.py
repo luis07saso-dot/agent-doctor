@@ -39,6 +39,14 @@ PREHIRE_HARD_TIMEOUT_S = REPLY_BUDGET_S + 2.0
 AUDIT_BUDGET_S = REPLY_BUDGET_S
 MIN_PROBE_S = 1.0  # less than this left: don't wait, report the check as still running
 LIVE_PENDING = "pending"  # format_report: probe started but not finished within the budget
+# Q20a (FB-5 "it doesn't actually interact with the agent"): single-agent audits also send
+# the agent one test message (user decision 2026-11-07: single-target only, because the probe
+# counts in the target's own Agentverse metrics). Wait at most LIVE_WAIT_S; the result never
+# changes the score. Off switch: AUDIT_LIVE=0 in the VPS .env (read per reply).
+LIVE_WAIT_S = 8.0
+_BACKGROUND: set = set()  # fire-and-forget probes (_live_check), kept alive until done
+LIVE_CAPPED = "capped"  # format_report: live test skipped, probe limit reached
+LIVE_MULTI = "multi"  # format_report: several agents named, live test skipped
 # Q12 findability: wait at most FIND_WAIT_S for the searches, and never past the reply budget
 # minus FIND_MARGIN_S. Less than MIN_FIND_S left: start them (cache warms), don't wait.
 FIND_WAIT_S = 7.0
@@ -215,10 +223,15 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
         sc = score(lk)
 
         async def live_check() -> Any:
-            if probe is not None and lk.address and sc.check("responsive").detail == UNRESPONSIVE_FLAG:
+            if probe is None or not lk.address:
+                return None
+            if sc.check("responsive").detail == UNRESPONSIVE_FLAG:  # Q2: flagged, as before
                 return await _live_check(probe, lk.address,
                                          AUDIT_BUDGET_S - (time.monotonic() - started))
-            return None
+            if not sc.check("active").ok:
+                return None  # offline: the Active fix says it; a probe would only time out
+            return await _audit_live(probe, lk.address, n, sender_key, self_addresses,
+                                     AUDIT_BUDGET_S - (time.monotonic() - started))
 
         live, find = await asyncio.gather(live_check(), _findability(client, lk, sc, started))
         diff = _recheck(lk, sc, diff_key(sender_key, chat_key))
@@ -542,11 +555,41 @@ async def _lookup(client: LookupClient, target: Target) -> Lookup:
     return await client.lookup_handle(target.value)
 
 
+async def _audit_live(probe: ProbeFn, address: str, n_targets: int, sender_key: str,
+                      self_addresses: Iterable[str], remaining: float) -> Any:
+    """Q20a: live test of a non-flagged agent in a single-agent audit. Returns a ProbeResult,
+    LIVE_PENDING, LIVE_CAPPED, LIVE_MULTI or None (off, self, error). Never raises."""
+    try:
+        if os.getenv("AUDIT_LIVE", "1").strip() == "0":
+            return None
+        if address.strip().lower() in {a.strip().lower() for a in self_addresses if a}:
+            return None  # never probe ourselves
+        if n_targets > 1:
+            return LIVE_MULTI
+        if not scout.AUDIT_CAPS.allow(sender_key, 1):
+            return LIVE_CAPPED
+        res = await _live_check(probe, address, min(LIVE_WAIT_S, remaining))
+        if res is None or getattr(res, "status", res) in ("skipped", "error"):
+            return None  # no verdict to show (self, busy, internal error)
+        return res
+    except Exception:
+        return None
+
+
 async def _live_check(probe: ProbeFn, address: str, remaining: float) -> Any:
     """Q2: probe a flagged agent within what's left of the reply budget. Returns the
     ProbeResult, or LIVE_PENDING if it isn't done in time. The probe keeps running (and is
     cached for 10 min), so a follow-up "is <agent> live?" answers instantly."""
     if remaining < MIN_PROBE_S:
+        # Start it anyway so "still running, ask again" is true (Q20a review: it used to
+        # return pending without ever sending the probe).
+        try:
+            task = asyncio.ensure_future(probe(address))
+            _BACKGROUND.add(task)  # asyncio keeps only weak refs to tasks
+            task.add_done_callback(_BACKGROUND.discard)
+            task.add_done_callback(scout._retrieve)
+        except Exception:
+            return None
         return LIVE_PENDING
     try:
         return await asyncio.wait_for(asyncio.shield(probe(address)), remaining)

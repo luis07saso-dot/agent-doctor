@@ -80,7 +80,7 @@ def test_link_survives_even_when_body_must_be_cut():
 def test_no_address_no_link_but_still_valid():
     lk = dataclasses.replace(load("weak"), address=None)
     out = format_report(lk, score(lk))
-    assert "Open profile" not in out and "re-check\" any time" in out
+    assert "Open profile" not in out and "\"re-check\" after changes" in out
 
 
 # ---------- Q5: how-to under each fix ----------
@@ -91,7 +91,7 @@ def test_every_top_fix_has_a_how_line(name):
     sc = score(lk)
     out = format_report(lk, sc)
     assert len(out) <= MAX_CHARS
-    assert out.count("\n   How: ") == min(3, len(sc.fixes))
+    assert out.count("\n   How: ") == min(1, len(sc.fixes))  # Q22a: fix #1 only
     assert 'Ask "how do I fix #1"' in out
 
 

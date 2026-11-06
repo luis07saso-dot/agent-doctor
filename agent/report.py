@@ -10,6 +10,18 @@ from agent.scorer import UNRESPONSIVE_FLAG, Score
 
 MAX_CHARS = 1500
 TOP_FIXES = 3
+ASK_FIXES = "Ask \"how do I fix #1\", \"why this score?\" or \"re-check\" after changes."
+ASK_NO_FIXES = "Ask \"why this score?\" or \"re-check\" after changes."
+# Q22a: short names for the "Checks" line. Values come from scorer details (already clean).
+_SHORT = {
+    "active": "Active", "chat_protocol": "Chat Protocol", "readme_sections": "README sections",
+    "readme": "README", "rating": "Rating", "description": "Description",
+    "responsive": "Responsive", "handle": "Handle", "avatar": "Avatar",
+    "interactions": "Interactions", "success_rate": "ASI:One success", "eval_rate": "Testing",
+    "website": "Website", "starter_prompts": "Starter prompts",
+}
+_WITH_VALUE = ("readme_sections", "rating", "interactions", "success_rate", "eval_rate",
+               "starter_prompts")
 PROFILE_URL = "https://agentverse.ai/agents/details/{address}/profile"
 PROBE_WAIT_S = 14  # agent/probe.py PROBE_TIMEOUT_S, for wording only (report stays I/O-free)
 _UNSAFE = re.compile(r"[\r\n`*_\[\]<>|#~\\]+")
@@ -50,7 +62,7 @@ def _pts(x: float) -> str:
 def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "",
                   find: Any = None, diff: Any = None) -> str:
     """`live` (Q2): ProbeResult of a live check, "pending" if it didn't finish in time, or
-    None (not run). Only used when Agentverse flags the agent unresponsive.
+    None (not run). Flagged agents: part of the flag note. Q20a: otherwise one live_line.
     `footer` (e.g. the multi-target note) goes last; the result incl. footer is <= MAX_CHARS.
 
     Q5: each top fix gets a one-line how-to; dropped from the last fix up if the report
@@ -82,43 +94,26 @@ def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "",
 
     c = sc.check
     flagged = c("responsive").detail == UNRESPONSIVE_FLAG
+    # No "@" in the follow-up: on ASI:One "@other" routes the message to the other agent.
+    ask = clean(handle, 25) if handle else (lookup.address or "")
     if flagged:
-        # No "@" in the follow-up: on ASI:One "@other" routes the message to the other agent.
-        ask = clean(handle, 25) if handle else (lookup.address or "")
         lines.append(_flag_note(profile, live, ask))
+    elif live is not None:
+        line = live_line(live, ask)
+        if line:
+            lines.append(line)
 
     head = lines
     fixes = sc.fixes[:TOP_FIXES]
-    hows: list[str] = []
-    for f in fixes:  # offline agents: "active" and "responsive" share a how-to; show it once
-        how = short_how(f)
-        hows.append("" if how in hows else how)
+    # Q22a (FB-7 "the text is very large"): a How line on fix #1 only; the rest is one
+    # "Checks" line with only what the top fixes don't already say. The weights note lives
+    # in "why this score?" and the README.
+    hows = [short_how(fixes[0])] if fixes else []
 
-    details = [
-        "",
-        "**Details**",
-        " · ".join([
-            f"{_mark(c('active').ok)} Active",
-            f"{_mark(c('chat_protocol').ok)} Chat Protocol",
-            f"{_mark(c('handle').ok)} Handle",
-            f"{_mark(c('avatar').ok)} Avatar",
-            f"{_mark(c('description').ok)} Description",
-            "⚠️ Agentverse flag: unresponsive" if flagged
-            else f"{_mark(c('responsive').ok)} Responsive",
-        ]),
-        f"README: {c('readme').detail}, {c('readme_sections').detail} · "
-        f"Rating {c('rating').detail} · Interactions {c('interactions').detail}",
-        f"ASI:One success: {c('success_rate').detail} · Testing: {c('eval_rate').detail} · "
-        f"Website: {safe_domain(c('website').detail) if c('website').ok else 'none'} · Starter prompts: {c('starter_prompts').detail}",
-        "",
-        "_Weights are our estimate (Agentverse doesn't publish them). "
-        "Keywords are private, so not scored._",
-    ]
+    details = ["", checks_line(sc, fixes, flagged)]
     if any(f.kind == "no_data" for f in fixes):  # Q10: legend only when a Tip is listed
         details.append("_Tip = no data from Agentverse, general advice._")
-    tail = ["", ("Ask \"how do I fix #1\" for step-by-step help, or \"why this score?\" for the "
-                 "evidence. " if fixes else "Ask \"why this score?\" for the evidence. ")
-            + "Say \"re-check\" any time after changes."]
+    tail = ["", (ASK_FIXES if fixes else ASK_NO_FIXES)]
     if lookup.address:
         tail += ["", f"[Open profile on Agentverse]({PROFILE_URL.format(address=lookup.address)})"]
     tail_text = "\n" + "\n".join(tail) + footer
@@ -146,13 +141,41 @@ def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "",
         block = find_block(find, c("active").ok, find_level) if find_level < 4 else ""
         return hard_breaks("\n".join(body + details + (["", block] if block else [])))
 
-    for n_how in range(len(fixes), -1, -1):
+    for n_how in range(len(hows), -1, -1):
         for d_level in diff_levels:
             for level in find_levels:
                 text = build(n_how, level, d_level) + tail_text
                 if len(text) <= MAX_CHARS:
                     return text
     return fit(build(0), tail_text)
+
+
+def checks_line(sc: Score, fixes: Any, flagged: bool = False) -> str:
+    """Q22a: one line. "✅ 9/14 full marks · ❌ Also: Website · ❔ No data: ASI:One success,
+    Testing (none shared)". Checks already listed as a top fix are left out."""
+    shown = {f.rule for f in fixes}
+    if "readme" in shown and sc.check("readme").points == 0:
+        shown.add("readme_sections")  # one combined README fix covers both
+    if not sc.check("active").ok:
+        shown.add("responsive")  # offline: same cause as the Active fix
+    full = sum(1 for ch in sc.checks if ch.ok)
+    found, no_data = [], []
+    for ch in sc.checks:
+        if ch.ok or ch.rule in shown:
+            continue
+        if ch.kind == "no_data":
+            no_data.append(_SHORT[ch.rule] + (" (none shared)" if ch.rule == "eval_rate" else ""))
+        elif ch.rule == "responsive" and flagged:
+            found.append("Responsive (Agentverse flag)")
+        else:
+            val = f" {clean(ch.detail, 20)}" if ch.rule in _WITH_VALUE else ""
+            found.append(_SHORT[ch.rule] + val)
+    parts = [f"✅ {full}/{len(sc.checks)} full marks"]
+    if found:
+        parts.append(("❌ Also: " if fixes else "❌ ") + ", ".join(found))
+    if no_data:
+        parts.append("❔ No data: " + ", ".join(no_data))
+    return "**Checks:** " + " · ".join(parts)
 
 
 FIND_HEAD = "🔍 Agentverse search (top 50): "
@@ -181,6 +204,30 @@ def find_block(find: Any, active: bool, level: int = 0) -> str:
     if level == 0 and missing and active:
         line += "." + FIND_ADVICE
     return line
+
+
+def live_line(live: Any, ask: str = "") -> str:
+    """Q20a: live test of a non-flagged agent (we sent it one chat message). Info only, never
+    scored. `live` = ProbeResult or "pending" | "capped" | "multi" (agent/service.py)."""
+    status = live if isinstance(live, str) else getattr(live, "status", None)
+    q = f"\"is {ask or 'this agent'} live?\""
+    if status == "live":
+        reply_ms = getattr(live, "reply_ms", None)
+        took = f" in {reply_ms / 1000:.1f}s" if isinstance(reply_ms, (int, float)) else ""
+        return f"_✅ Live test: it answered our test message{took}. Not part of the score._"
+    if status == "degraded":
+        return (f"_⚠️ Live test: it acknowledged our test message but sent no answer within "
+                f"{PROBE_WAIT_S}s. Not part of the score._")
+    if status == "unreachable":
+        return (f"_❌ Live test: no reply to our test message within {PROBE_WAIT_S}s. Check it's "
+                "running and its mailbox is connected. Not part of the score._")
+    if status == "pending":
+        return f"_⏳ Live test still running: ask {q} in a minute._"
+    if status == "capped":
+        return f"_Live test skipped (hourly limit): ask {q} later._"
+    if status == "multi":
+        return f"_Live test: ask {q} to test it._"
+    return ""
 
 
 def _flag_note(profile: dict, live: Any = None, ask: str = "") -> str:

@@ -22,6 +22,7 @@ from agent.router import RULE_NAMES
 
 INT_FIELDS = ("total_interactions", "recent_interactions", "recent_verified_interactions",
               "recent_success_verified_interactions")
+TESTING_NONE = "none shared by Agentverse"  # Q21 (FB-6): null eval rate, never "not found"
 FLOAT_FIELDS = ("recent_success_rate", "recent_eval_success_rate", "rating")
 
 
@@ -82,7 +83,7 @@ def _value(check: Any, f: dict, lookup: Any) -> str:
         return _pct(rate)
     if rule == "eval_rate":
         rate = f["recent_eval_success_rate"]
-        return "no data" if rate is None else _pct(rate)
+        return TESTING_NONE if rate is None else _pct(rate)
     if rule == "interactions":
         total, recent = f["total_interactions"], f["recent_interactions"]
         if total is None:
@@ -163,8 +164,13 @@ def _topics(text: str, f: dict, extra: tuple[str, ...] = ()) -> list[str]:
                    "Agentverse doesn't publish the formula.")
     if "testing" in keys:
         e = f["recent_eval_success_rate"]
-        out.append(f"Testing score: {'no data from Agentverse' if e is None else _pct(e)}. "
-                   "Agentverse doesn't say when it's empty.")
+        if e is None:  # Q21 (FB-6): never "not found"; the owner's Testing tab may have runs
+            out.append("Testing score: Agentverse shares no recent Testing result for this agent "
+                       "(most agents we checked have none). It doesn't say which runs it shares "
+                       "or when, so your Testing tab may still have runs. It scores 0 here "
+                       "until Agentverse shares one.")
+        else:
+            out.append(f"Testing score: {_pct(e)}. Agentverse doesn't say which runs it counts.")
     return out
 
 
@@ -185,7 +191,7 @@ def format_explain(shown: Any, text: str, extra_topics: tuple[str, ...] = (),
     f = shown.facts_dict
     head = [f"**Why {shown.name} scored {shown.total}/100 · {shown.verdict}**",
             "Data: Agentverse public profile + Almanac. Points are our estimate "
-            "(weights not published)."]
+            "(weights not published). Keywords are private, so not scored."]
     topics_ = _topics(text or "", f, tuple(extra_topics))
     focus_row = next((r for r in shown.rows if r.rule == focus), None) if focus else None
     if focus_row is not None:

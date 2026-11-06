@@ -67,11 +67,18 @@ def test_flagged_agent_gets_live_verdict(status, phrase):
     assert len(res.text) <= MAX_CHARS
 
 
-@pytest.mark.parametrize("name", ["strong", "weak", "dead"])
-def test_unflagged_or_offline_agents_are_never_probed(name):
+def test_offline_agents_are_never_probed():
+    probe, calls = prober()
+    res = run("dead", probe)
+    assert calls == [] and res.live == ""
+
+
+@pytest.mark.parametrize("name", ["strong", "weak"])
+def test_unflagged_active_agents_get_one_live_test(name):  # Q20a (FB-5)
     probe, calls = prober()
     res = run(name, probe)
-    assert calls == [] and res.live == ""
+    assert len(calls) == 1 and res.live == "live"
+    assert "✅ Live test: it answered our test message in 2.4s. Not part of the score._" in res.text
 
 
 def test_slow_probe_reports_pending_within_budget(monkeypatch):
@@ -88,7 +95,8 @@ def test_no_budget_left_skips_waiting(monkeypatch):
     monkeypatch.setattr(service, "AUDIT_BUDGET_S", 0.0)
     probe, calls = prober()
     res = run("flagged", probe)
-    assert res.live == "pending" and calls == []
+    # Not waited for, but started: the reply says "still running, ask again" (Q20a fix).
+    assert res.live == "pending" and len(calls) == 1
 
 
 def test_probe_error_falls_back_to_q1_note():

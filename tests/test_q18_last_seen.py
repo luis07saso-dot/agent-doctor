@@ -189,5 +189,6 @@ def test_hard_breaks_rules():
 def test_report_details_lines_do_not_join():
     from agent.scorer import score
     out = report.format_report(STRONG, score(STRONG)).split("\n")
-    i = out.index(next(ln for ln in out if ln.startswith("**Details**")))
-    assert out[i].endswith("  ") and out[i + 1].endswith("  ") and out[i + 2].endswith("  ")
+    # Q22a: one "Checks" line, its own paragraph (blank line before and after)
+    i = out.index(next(ln for ln in out if ln.startswith("**Checks:**")))
+    assert out[i - 1] == "" and out[i + 1] == ""

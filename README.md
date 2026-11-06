@@ -20,7 +20,8 @@ It is built for agent builders asking "why is nobody finding my agent?". Think o
 - **Same input, same output**: rule-based scoring, no LLM guesswork. Results cached for 5 minutes.
 - **Ask about the audit in your own words**: after an audit, questions like "it has 769 chats, why do you say get real users?" or "how can I improve the avatar" get an answer from that audit's data. A small model only picks which check or topic you mean; every number and sentence comes from the audit.
 - **Ask what a word means**: `what do you mean by "bring real users"?`, `what is a Testing run?`, `what does needs attention mean?`, or `explain step 3` after a fix guide get a short fixed answer based on the Agentverse docs (with that agent's data, if you audited one). Small talk and off-topic questions are still politely declined.
-- **Free**. Quick answers take about a second. An audit also runs up to 3 Agentverse searches and waits at most 7 seconds for them. Replies that include a live test take up to 15 seconds.
+- **Free**. Quick answers take about a second. An audit also runs up to 3 Agentverse searches and a live test (one test message to the agent), and waits at most 8 seconds for them. Replies that include a live test take up to 15 seconds.
+- **Live test in every single-agent audit**: Agent Doctor messages the audited agent once and shows whether it answered (`✅ Live test: it answered our test message in 2.4s`). It never changes the score. Audit, Pre-Hire Check and Agent Scout share one live-test cache, so `is my-weather-bot live?` right after an audit answers at once.
 - **Pre-Hire Check (live test)**: ask `is my-weather-bot live?` and Agent Doctor sends that agent one test message, times its acknowledgement and answer, and adds its rating and profile score. Other agents can call it too (see "For agents").
 - **Why this score?**: after an audit, ask `why this score?` to see the data behind each check. A check Agentverse has no data for shows "no data" (0 points), not a failure.
 - **Findability test**: searches Agentverse for up to 3 of the agent's own starter prompts and shows where it ranks in the top 50, so you see whether users typing those words can find it.
@@ -61,18 +62,12 @@ Top fixes
    Use cases, Limitations, Metadata (+23 pts)
    How: Profile tab → Edit README, start with `## Summary`: what it does and for whom.
 2. Found: Raise rating: pass Agentverse Testing runs and get real ASI:One users (+8.4 pts)
-   How: Testing tab → Questions → Generate, run them, fix failures; bring real users.
 3. Found: Add a one-line Agent Description (+6 pts)
-   How: Profile tab → Agent Description, e.g. "Summarises news articles into
-   5 bullets for busy readers."
 
-Details
-✅ Active · ✅ Chat Protocol · ✅ Handle · ❌ Avatar · ❌ Description · ✅ Responsive
-README: missing, 0/6 sections · Rating 0.8/5 · Interactions 14
-ASI:One success: no data · Testing: no data · Website: none · Starter prompts: 0
+Checks: ✅ 5/14 full marks · ❌ Also: Avatar, Website, Starter prompts 0 ·
+❔ No data: ASI:One success, Testing (none shared)
 
-Ask "how do I fix #1" for step-by-step help, or "why this score?" for the evidence.
-Say "re-check" any time after changes.
+Ask "how do I fix #1", "why this score?" or "re-check" after changes.
 
 Open profile on Agentverse
 ```
@@ -206,10 +201,10 @@ your message
   → Agentverse lookup: public profile + Almanac record (cached 5 min)
   → scorer: rule-based checks against the Agentverse ranking factors
   → at the same time:
-       live test   (only if Agentverse flags the agent "unresponsive")
+       live test   (single-agent audits of active agents; not scored)
        findability (up to 3 Agentverse searches for its starter prompts)
   → re-check diff against your last check of the same agent
-  → report: score, verdict, top 3 fixes with How: lines
+  → report: score, verdict, live test, top 3 fixes (How: line on #1), one Checks line
 ```
 
 Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 → audit score each (an agent the Almanac shows offline is dropped) → live test of the first 2 → pick.
@@ -219,7 +214,7 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **Data used**: public Agentverse endpoints only (agent search, agent profile, Almanac registration and handles). No private data, no logins.
 - **Privacy**: logs keep no message text, and sender IDs are hashed. A question the rules don't recognise is sent to the ASI:One API (Fetch.ai) with agent addresses, links, emails and long tokens removed, only to pick the topic; with it goes the text of the fix guide you last saw, if any, so "that step" can be understood. Nothing else is sent. Agent Scout sends your search words (not your message) to Agentverse search and keeps the last list per chat for 24 hours in memory, so `audit #2` works. To power fix guides, `why this score?` and the re-check diff, Agent Doctor stores the last agent audited or checked in a chat (24 hours) and the last score and pass/fail of each check per agent you checked (30 days, up to 20 agents). Keys are hashed; only public agent data (name, address, score, check results) is kept. Send `forget` to delete it.
 - **Reliability**: an error gets a short "try again" reply, never silence or a crash. Rate limits and a loop guard stop runaway agent-to-agent loops (a conversation that keeps flooding is paused for 24 hours). Runs 24/7 on a dedicated server with a watchdog and one-step rollback.
-- **Tested**: 1,429 automated tests, plus live checks on ASI:One.
+- **Tested**: 1,458 automated tests, plus live checks on ASI:One.
 
 ## Use cases
 
@@ -233,7 +228,7 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 
 ## Limitations
 
-- **Scores the profile, not the agent's skills.** The audit only sends the agent a test message when Agentverse flags it "unresponsive" (to confirm or overturn the flag). Pre-Hire Check sends one on request. Either way: one short test message, at most once per agent every 10 minutes.
+- **Scores the profile, not the agent's skills.** A single-agent audit of an active agent sends it one test message and reports the result next to the score, never in it; audits of several agents at once, and offline agents, are not messaged (unless Agentverse flags them "unresponsive": then the audit tests the first one to confirm or overturn the flag). Pre-Hire Check sends one on request. Either way: one short test message, at most once per agent every 10 minutes, with hourly limits. Agentverse counts conversations started by other agents in an agent's success rate, so a test message the agent ignores counts like any unanswered chat.
 - **Pre-Hire Check tests availability, not answer quality.** LIVE means the agent answered within 14 seconds; it does not judge the answer. An agent that acknowledges but answers after 14s shows as DEGRADED; one that does not even acknowledge shows as UNREACHABLE.
 - **Fix guides follow the last audit in the same chat.** `how do I fix #2` and `why this score?` need an audit earlier in that chat; it is kept for 24 hours, also across restarts. Guides follow the Agentverse docs; the Agentverse UI may change.
 - **Findability is information, not score.** It uses Agentverse search; ASI:One may rank agents differently. Agents without usable starter prompts get no findability line. A search that is slow shows "not checked": re-check a minute later.
@@ -242,6 +237,7 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **Follow-up questions about an agent's data need an audit in the same chat.** Questions about Agentverse words (Testing runs, real users, success rate…) work without one. A one-word message gets the standard reply. The model can pick the wrong check or explainer; the answer is then about that one, never invented facts. `explain step 2` follows the last fix guide in the chat.
 - **No health or medical answers.** Agent Doctor checks AI agents, not people. Health and medicine questions get a fixed reply that points to a health professional (and to Agent Scout for health agents on Agentverse).
 - **Weights are our estimate.** Agentverse does not publish its ranking weights. The rubric follows the official docs' emphasis; the same input always gives the same score.
+- **Testing results: only what Agentverse shares.** Its public data often has no recent Testing result, even when the owner has runs in the Testing tab. A missing result scores 0 and shows as a Tip, never as "not found".
 - **Keywords are not checked yet.** Make sure each keyword appears in your README.
 - **Mainnet only.** Testnet agents are not checked.
 - **One agent per message.** Only the first agent in a message is audited.
@@ -261,6 +257,6 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **Data sources**: public Agentverse search and Almanac APIs
 - **Privacy**: logs keep no message text; sender IDs are hashed; `forget` deletes stored audits
 - **Price**: free
-- **Version**: 0.12.0
+- **Version**: 0.13.0
 - **Maintainer**: [leedr.tech](https://leedr.tech)
 - **Built for**: Stranger Builds hackathon, Fetch.ai track
