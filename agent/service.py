@@ -19,7 +19,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, replace
 from typing import Any, Awaitable, Callable, Iterable, Optional, Protocol
 
-from agent import cards, evidence, findability, guides, llm, recheck, router, scout
+from agent import cards, concepts, evidence, findability, guides, llm, recheck, router, scout
 from agent.agentverse import Lookup
 from agent.extract import Target
 from agent.report import PROFILE_URL, TOP_FIXES, clean, fit, format_report, short_address
@@ -142,10 +142,16 @@ async def _handle(text: str, client: LookupClient, self_handles: Iterable[str],
                          fallback=None)
     if intent.kind == "fix_guide":
         return _fix_guide(intent.n, chat_key)
+    if intent.kind == "concept":  # Q19: what a word Doctor uses means
+        return Result(concepts.reply(intent.key, guides.LAST.get(chat_key)),
+                      f"concept_{intent.key}", "none")
+    if intent.kind == "step":
+        return _step(intent.n, intent.fix, chat_key)
     if intent.kind == "forget":
         ok = await guides.LAST.memory.forget(diff_key(sender_key, chat_key), chat_key, sender_key)
         scout.LISTS.drop_sender(sender_key, chat_key)
         _LATEST.pop(chat_key, None)
+        _LAST_FIX.pop(chat_key, None)
         return Result(router.FORGET_DONE if ok else router.FORGET_ERROR,
                       "forget" if ok else "forget_error", "none")
     if intent.kind == "explain" and not intent.targets:
@@ -416,12 +422,14 @@ LLM_MIN_WORDS, LLM_MAX_WORDS = 2, 60
 
 
 async def _followup(text: str, chat_key: str, rules: Result, kind: str) -> Result:
-    """Q11 (SCOPE A1): after an audit in this chat, a question the rules only answered
-    generically. The LLM picks (ask, check, topic) from fixed lists; the reply is built from
-    the remembered audit. Not asked, off, slow or unsure -> `rules`, unchanged. Never raises."""
+    """Q11 (SCOPE A1) + Q19: a question the rules only answered generically (or refused). The
+    LLM picks (ask, check, topic, concept) from fixed lists; the reply is fixed text, built from
+    the remembered audit or a concept explainer. Without an audit only a concept (or "general":
+    in scope, unclear) is used. Not asked, off, slow or unsure -> `rules`. Never raises."""
     try:
         shown = guides.LAST.get(chat_key)
-        if kind not in LLM_KINDS or shown is None or not shown.rows:
+        has_rows = shown is not None and bool(shown.rows)
+        if kind not in LLM_KINDS or (kind == "explain" and not has_rows):
             return rules
         if not LLM_MIN_WORDS <= len(re.findall(r"\S+", text or "")) <= LLM_MAX_WORDS:
             return rules
@@ -429,10 +437,11 @@ async def _followup(text: str, chat_key: str, rules: Result, kind: str) -> Resul
             return rules
         if (kind == "explain" and evidence.topics(text)) or router.faq_key(text):
             return rules  # the rules already know what it's about
-        f, label = await llm.MAPPER.map(text, chat_key)
+        f, label = await llm.MAPPER.map(text, chat_key, _llm_context(chat_key, shown))
         if f is None or label != "used":
             return replace(rules, llm=label)
-        if f.ask == "fix" and f.check != "none":
+        audit_ask = has_rows and f.ask in ("explain", "fix")
+        if audit_ask and f.ask == "fix" and f.check != "none":
             k = next((i + 1 for i, c in enumerate(shown.fixes) if c.rule == f.check), 0)
             if k:
                 return replace(_fix_guide(k, chat_key), input_type=rules.input_type, llm="used")
@@ -440,12 +449,33 @@ async def _followup(text: str, chat_key: str, rules: Result, kind: str) -> Resul
             if row is not None:
                 return Result(evidence.focus_reply(shown, row), "explain", rules.input_type,
                               llm="used")
-        body = evidence.format_explain(shown, text,
-                                       (f.topic,) if f.topic != "none" else (),
-                                       f.check if f.check != "none" else "")
-        return Result(body, "explain", rules.input_type, llm="used")
+        if f.concept != "none":  # Q19: "what do you mean by …": the explainer, not the breakdown
+            return Result(concepts.reply(f.concept, shown if has_rows else None),
+                          f"concept_{f.concept}", rules.input_type, llm="used")
+        if audit_ask and (f.check != "none" or f.topic != "none"):
+            body = evidence.format_explain(shown, text,
+                                           (f.topic,) if f.topic != "none" else (),
+                                           f.check if f.check != "none" else "")
+            return Result(body, "explain", rules.input_type, llm="used")
+        if kind != "off_scope":
+            return replace(rules, llm="none")  # help / "why this score?" are already in scope
+        # In scope (the model said so) but no fixed answer fits: say what I can explain,
+        # instead of "I only audit agents" or the generic help text.
+        return Result(concepts.unsure(shown if has_rows else None), "unsure", rules.input_type,
+                      llm="used")
     except Exception:
         return rules
+
+
+def _llm_context(chat_key: str, shown: Optional[guides.Shown]) -> str:
+    """Q19: the fix guide this chat saw last (our own fixed text), so "what do you mean by
+    that?" or "the third one" has something to refer to. "" if none."""
+    n = last_fix(chat_key, shown)
+    if not n:
+        return ""
+    check = shown.fixes[n - 1]
+    steps = guides.guide_parts(check)[1]
+    return f"Fix #{n}: {check.fix}. Steps: " + " ".join(f"{i}. {t}" for i, t in enumerate(steps, 1))
 
 
 def _explain(chat_key: str, text: str) -> Result:
@@ -467,7 +497,43 @@ def _fix_guide(n: int, chat_key: str) -> Result:
     if shown.address:
         tail = f"\n\n[Open profile on Agentverse]({PROFILE_URL.format(address=shown.address)})"
     body = guides.full_guide(n, shown.fixes[n - 1], shown.name)
+    _put_fix(chat_key, n, shown)
     return Result(fit(body, tail), "fix_guide", "none")
+
+
+# Q19: which fix guide this chat saw last, so "explain step 2" knows its steps. In memory only.
+_LAST_FIX: "OrderedDict[str, tuple[int, str]]" = OrderedDict()  # chat -> (fix n, address)
+
+
+def _put_fix(chat_key: str, n: int, shown: guides.Shown) -> None:
+    if not chat_key:
+        return
+    _LAST_FIX[chat_key] = (n, shown.address)
+    _LAST_FIX.move_to_end(chat_key)
+    while len(_LAST_FIX) > LATEST_MAX:
+        _LAST_FIX.popitem(last=False)
+
+
+def last_fix(chat_key: str, shown: Optional[guides.Shown]) -> int:
+    """Fix number of the guide this chat saw last, if it is for the remembered agent; else 0."""
+    got = _LAST_FIX.get(chat_key)
+    if got is None or shown is None or got[1] != shown.address or not 1 <= got[0] <= len(shown.fixes):
+        return 0
+    return got[0]
+
+
+def _step(step: int, fix_n: int, chat_key: str) -> Result:
+    """Q19: "explain step 2" = that step of the last fix guide (or of fix #fix_n)."""
+    shown = guides.LAST.get(chat_key)
+    if shown is None:
+        return Result(router.NO_AUDIT_YET, "step_none", "none")
+    n = fix_n or last_fix(chat_key, shown)
+    if not n:
+        return Result(fit(concepts.STEP_NO_GUIDE), "step_none", "none")
+    if not 1 <= n <= len(shown.fixes):
+        return Result(router.no_such_fix(n, len(shown.fixes), shown.name), "step_none", "none")
+    _put_fix(chat_key, n, shown)  # "explain the next step" stays on this guide
+    return Result(concepts.step_reply(step, n, shown.fixes[n - 1], shown), "step", "none")
 
 
 async def _lookup(client: LookupClient, target: Target) -> Lookup:

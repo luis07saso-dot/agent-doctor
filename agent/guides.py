@@ -262,8 +262,12 @@ def _sections_guide(check: Check) -> tuple[str, list[str], str]:
     return why, steps, example
 
 
-def full_guide(n: int, check: Check, name: str = "") -> str:
-    """Markdown guide for fix #n. Caller adds the profile link and fits it to MAX_CHARS."""
+# Q19: the "why" line per check, for concept answers ("what is a handle?").
+GUIDE_WHY: dict[str, str] = {k: v[0] for k, v in _GUIDES.items()}
+
+
+def guide_parts(check: Check) -> tuple[str, list[str], str]:
+    """(why, steps, example) of the fix guide for `check`, as `full_guide` shows them."""
     if check.rule == "readme_sections":
         why, steps, example = _sections_guide(check)
     elif check.rule == "responsive" and check.detail != UNRESPONSIVE_FLAG:
@@ -275,6 +279,12 @@ def full_guide(n: int, check: Check, name: str = "") -> str:
         if check.rule == "readme" and not _readme_missing(check):
             steps = [f"Your README is {check.detail}: too short to be indexed well. "
                      f"Aim for {R.README_MIN_CHARS}+ characters of plain description."] + steps
+    return why, steps, example
+
+
+def full_guide(n: int, check: Check, name: str = "") -> str:
+    """Markdown guide for fix #n. Caller adds the profile link and fits it to MAX_CHARS."""
+    why, steps, example = guide_parts(check)
     pts = f"{check.lost:.1f}".rstrip("0").rstrip(".")
     title = f"**Fix #{n}{' for ' + name if name else ''}: {check.fix}** (+{pts} pts)"
     parts = [title, "", why, "", "**Steps**"]

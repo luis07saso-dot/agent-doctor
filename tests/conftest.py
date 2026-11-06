@@ -16,3 +16,4 @@ def _fresh_latest(monkeypatch):
 
     from agent import service
     monkeypatch.setattr(service, "_LATEST", OrderedDict())
+    monkeypatch.setattr(service, "_LAST_FIX", OrderedDict())

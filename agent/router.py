@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from typing import Iterable, Literal, Optional
 
+from agent import concepts
 from agent import rubric as R
 from agent.extract import Target, extract, handle_anchored, soft_handles
 
@@ -271,7 +272,7 @@ def is_greeting(text: str) -> bool:
 
 Kind = Literal["audit", "prehire", "help", "need_target", "prehire_need_target", "bad_address",
                "off_scope", "fix_guide", "faq", "explain", "explain_none", "forget",
-               "recheck_none", "scout", "scout_need_what", "scout_pick_none"]
+               "recheck_none", "scout", "scout_need_what", "scout_pick_none", "concept", "step"]
 
 # Q15: "forget me" / "delete my data". A verb needs a data noun ("delete this" is not enough),
 # except "forget" on its own. Whole message only, so "forget it, audit X" is not one.
@@ -563,6 +564,7 @@ class Intent:
     hint: tuple[str, ...] = ()  # Q17b: words naming the agent meant ("tavily")
     query: str = ""  # Q13 scout: the search phrase
     pick: int = 0  # Q13: "audit #2" = agent #2 of this chat's last scout list (1-based)
+    fix: int = 0  # Q19 step: which fix guide ("step 2 of fix #1"); 0 = the last one shown
 
 
 def classify(text: str, self_handles: Iterable[str] = (),
@@ -588,6 +590,12 @@ def classify(text: str, self_handles: Iterable[str] = (),
         return Intent("help")
     if wants_forget(text):
         return Intent("forget")
+    step = concepts.step_number(text)
+    if step and has_audit and (_HOW.search(re.sub(r"\bsteps?\b", " ", text, flags=re.I))
+                               or concepts.match_cue(text)
+                               or len(re.findall(r"[A-Za-z0-9#]+", text)) <= FIX_SHORT_WORDS):
+        # Q19: "explain step 2" (of the last fix guide, or "of fix #1")
+        return Intent("step", n=step, fix=fix_number(text, False))
     n = fix_number(text, has_audit)
     if n:
         return Intent("fix_guide", n=n)
@@ -608,6 +616,11 @@ def classify(text: str, self_handles: Iterable[str] = (),
     if has_audit and key in ("", "score") and (explain or key == "score") and not wants_prehire \
             and not _AUDIT_CMD.search(text):
         return Intent("explain")  # about the last audit in this chat
+    # Q19: "what do you mean by 'bring real users'?", "what is a Testing run?". FAQs win;
+    # audits, fixes, scout and data questions about the last audit were matched above.
+    ck = "" if key or wants_prehire or _AUDIT_CMD.search(text) else concepts.match(text)
+    if ck:
+        return Intent("concept", key=ck)
     # Q18: a scout list also gives "audit it" something to mean (the service asks which one).
     ref = "" if soft else back_ref(text, wants_prehire, has_audit or has_scout)
     if ref and not key:  # Q17: "re-check the same agent", "is it live?". FAQs win.

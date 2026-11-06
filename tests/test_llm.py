@@ -92,7 +92,7 @@ def test_request_body_and_headers(on):
     js = body["response_format"]["json_schema"]
     assert body["response_format"]["type"] == "json_schema" and js["strict"] is True
     sch = js["schema"]
-    assert sch["additionalProperties"] is False and sch["required"] == ["ask", "check", "topic"]
+    assert sch["additionalProperties"] is False and sch["required"] == ["ask", "check", "topic", "concept"]
     assert sch["properties"]["check"]["enum"] == list(R.WEIGHTS) + ["none"]
     user = body["messages"][1]["content"]
     assert STRONG not in user and "https://" not in user and "[agent]" in user and "[link]" in user
@@ -293,10 +293,13 @@ def test_not_asked(on, monkeypatch, text):
     assert m._fetch.calls == [] and r.llm in ("", "off")
 
 
-def test_not_asked_without_audit(on, monkeypatch):
+def test_without_audit_only_concepts_or_unsure(on, monkeypatch):
+    # Q19: no audit in the chat: an off-scope reply may still be in scope. A data pick about an
+    # agent has nothing to read, so the reply says what I can explain (never audit data).
     m = use(monkeypatch, ok("explain", "rating"))
     r = say("why does it look so bad")
-    assert m._fetch.calls == [] and r.llm == ""
+    assert len(m._fetch.calls) == 1 and (r.outcome, r.llm) == ("unsure", "used")
+    assert "not sure" in r.text and "/100" not in r.text
 
 
 def test_llm_off_same_reply_byte_for_byte(on, monkeypatch):
