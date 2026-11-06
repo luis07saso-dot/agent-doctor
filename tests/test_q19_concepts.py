@@ -47,9 +47,9 @@ def test_off_topic_small_talk_still_refused(on, monkeypatch):  # noqa: F811
     ("how do I generate questions in the testing tab?", "testing"),
     ("what does needs attention mean?", "needs_attention"),
     ("what is manual test?", "manual_test"),
-    ("what counts as an interaction?", "interactions"),
+    ("what counts as an interaction for my agent?", "interactions"),  # Q24: needs context
     ("what are verified chats?", "verified_chats"),
-    ("what does unresponsive mean?", "unresponsive"),
+    ("what does unresponsive mean on agentverse?", "unresponsive"),
     ("what is the chat protocol?", "chat_protocol"),
     ("what's a starter prompt?", "starter_prompts"),
     ("what does found and tip mean?", "found_tip"),
@@ -105,7 +105,7 @@ def test_data_question_with_audit_stays_explain():
 
 def test_concept_with_audit_adds_that_agents_line():
     shown = with_audit()
-    r = say("what does unresponsive mean?")
+    r = say("what does unresponsive mean for my agent?")
     row = next(x for x in shown.rows if x.rule == "responsive")
     assert r.outcome == "concept_unresponsive" and f"For {shown.name}:" in r.text
     assert row.label in r.text and "Open profile on Agentverse" in r.text

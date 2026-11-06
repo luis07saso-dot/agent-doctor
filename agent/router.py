@@ -200,6 +200,49 @@ def faq_key(text: str) -> str:
         return "rules"
     return next((k for k, rx in _FAQ_PATTERNS if rx.search(text)), "")
 
+# Q24: a health / medicine question. Doctor checks AI agents, not people: never answer it, never
+# map it to an Agentverse explainer ("what is a drug interaction?" is not about Agentverse
+# interactions). Left out on purpose (Doctor's own metaphor, idioms, AI terms): doctor, health,
+# diagnosis, symptom, treatment, check-up, pain, pulse, heart (alone), side effects, sick of,
+# bleeding edge, toxic, poisoning, ingredients (alone), psychology, tablet, "active agent".
+_MEDICAL = re.compile(
+    r"\b(?:drugs?|medications?|medicines?|medical(?:ly)?|pills?|capsules?|dos(?:e|es|age|ing)|"
+    r"patients?|prescri(?:be|bed|ption)s?|ibuprofen|aspirin|paracetamol|acetaminophen|tylenol|"
+    r"advil|antibiotics?|antidepressants?|opioids?|insulin|vaccin\w*|"
+    r"allerg\w*|diseases?|illness(?:es)?|sickness|injur(?:y|ies|ed)|wounds?|"
+    r"blood|surger(?:y|ies)|surgical|surgeons?|hospital\w*|clinics?|clinical(?:ly)?|nurses?|"
+    r"pharmac\w*|overdos\w*|alcohol|coma(?:tose)?|unconscious\w*|seizures?|cpr|first\s+aid|"
+    r"pregnan\w*|(?:in)?active\s+ingredients?|vitamins?|supplements?|therap(?:y|ies|ists?)|"
+    r"mri|x-?rays?|muscles?|heart\s+(?:attack|rate|disease|failure)|fever|cancer|tumou?rs?|"
+    r"diabet\w*|infect\w*|chemo\w*|psychologists?|psychiatr\w*|mental\s+health|ana?esthe\w*|"
+    r"dementia|physicians?|dentists?|ambulance|(?:chemical|nerve|contrast|biological)\s+agents?)\b",
+    re.IGNORECASE)
+# A strong Agentverse word keeps a message in normal routing ("my agent gives dose advice, why
+# is it unresponsive?").
+_STRONG = re.compile(
+    r"\bagentverse\b|\basi:?\s?one\b|\basi1\b|\buagents?\b|\breadme\b|\bmarketplace\b|"
+    r"\baudit\w*|\b(?:my|our|your)\s+(?:[\w'-]+\s+){0,2}?(?:agents?|bots?)\b|\bai\s+agents?\b|"
+    r"\bchat\s?bots?\b|\bagent\s+doctor\b",
+    re.IGNORECASE)
+
+
+def medical(text: str, handles: Iterable[str] = ()) -> bool:
+    """Q24: a health / medicine question with no strong Agentverse word in it. `handles`: bare
+    agent handles found in the text ("pill-reminder"): their words don't count."""
+    t = text or ""
+    for h in handles:
+        t = re.sub(rf"(?<![\w-]){re.escape(h)}(?![\w-])", " ", t, flags=re.I)
+    return bool(_MEDICAL.search(t)) and not _STRONG.search(t)
+
+
+MEDICAL = (
+    "I'm Agent Doctor: I check AI agents on Agentverse, not people, so I can't answer health or "
+    "medicine questions. Please ask a pharmacist, doctor or other health professional. In an "
+    "emergency, call your local emergency number.\n\n"
+    "Looking for a health agent on Agentverse? Ask `find an agent that ...`. To check an agent, "
+    "send its address (`agent1q...`), @handle or Agentverse profile link."
+)
+
 EXPLAIN_NONE = (
     "I don't have an audit in this chat yet, so there's no score to explain. "
     "Send an agent address or handle first (e.g. `audit weather-bot`, no @), "
@@ -311,7 +354,8 @@ def is_greeting(text: str) -> bool:
 
 Kind = Literal["audit", "prehire", "help", "need_target", "prehire_need_target", "bad_address",
                "off_scope", "fix_guide", "faq", "explain", "explain_none", "forget",
-               "recheck_none", "scout", "scout_need_what", "scout_pick_none", "concept", "step"]
+               "recheck_none", "scout", "scout_need_what", "scout_pick_none", "concept", "step",
+               "medical"]
 
 # Q15: "forget me" / "delete my data". A verb needs a data noun ("delete this" is not enough),
 # except "forget" on its own. Whole message only, so "forget it, audit X" is not one.
@@ -648,6 +692,9 @@ def classify(text: str, self_handles: Iterable[str] = (),
     q = scout_query(text)
     if q is not None:  # Q13: "find me an agent that books flights"
         return Intent("scout", query=q) if q else Intent("scout_need_what")
+    if not wants_prehire and medical(text, soft_handles(text, self_handles)):  # Q24: before
+        # data questions, FAQs and concepts; bare handles ("pill-reminder") are agents
+        return Intent("medical")
     explain = explain_wanted(text)
     key = faq_key(text)
     base = _no_target(text)
@@ -705,6 +752,7 @@ def reply_for(kind: Kind) -> str:
         "prehire_need_target": PREHIRE_NEED_TARGET,
         "bad_address": BAD_ADDRESS,
         "off_scope": OFF_SCOPE,
+        "medical": MEDICAL,
         "explain_none": EXPLAIN_NONE,
         "recheck_none": RECHECK_NONE,
         "scout_need_what": SCOUT_NEED_WHAT,
@@ -716,4 +764,6 @@ def reply(intent: Intent) -> tuple[str, str]:
     """(reply text, log outcome) for an intent with no lookup to do."""
     if intent.kind == "faq":
         return FAQ[intent.key], f"faq_{intent.key}"
+    if intent.kind == "medical":
+        return MEDICAL, "off_scope_medical"
     return reply_for(intent.kind), intent.kind

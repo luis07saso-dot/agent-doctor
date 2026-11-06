@@ -219,7 +219,7 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **Data used**: public Agentverse endpoints only (agent search, agent profile, Almanac registration and handles). No private data, no logins.
 - **Privacy**: logs keep no message text, and sender IDs are hashed. A question the rules don't recognise is sent to the ASI:One API (Fetch.ai) with agent addresses, links, emails and long tokens removed, only to pick the topic; with it goes the text of the fix guide you last saw, if any, so "that step" can be understood. Nothing else is sent. Agent Scout sends your search words (not your message) to Agentverse search and keeps the last list per chat for 24 hours in memory, so `audit #2` works. To power fix guides, `why this score?` and the re-check diff, Agent Doctor stores the last agent audited or checked in a chat (24 hours) and the last score and pass/fail of each check per agent you checked (30 days, up to 20 agents). Keys are hashed; only public agent data (name, address, score, check results) is kept. Send `forget` to delete it.
 - **Reliability**: an error gets a short "try again" reply, never silence or a crash. Rate limits and a loop guard stop runaway agent-to-agent loops (a conversation that keeps flooding is paused for 24 hours). Runs 24/7 on a dedicated server with a watchdog and one-step rollback.
-- **Tested**: 1,365 automated tests, plus live checks on ASI:One.
+- **Tested**: 1,429 automated tests, plus live checks on ASI:One.
 
 ## Use cases
 
@@ -240,6 +240,7 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **`re-check` remembers the last agent for 24 hours.** It uses the last agent audited or Pre-Hire checked in the same chat (right after an Agent Scout list, `audit it` asks which one; `audit the autonomad agent` picks it by name); `re-check`, `same agent` or `again` also reach your latest audit from an earlier chat. Naming it works too (`is that same tavily agent live?`): if the name doesn't match the agent I remember, I say so instead of guessing. To check a different agent, send its address or handle.
 - **Re-check diff needs an earlier check.** It compares with your last complete check of the same agent in the past 30 days.
 - **Follow-up questions about an agent's data need an audit in the same chat.** Questions about Agentverse words (Testing runs, real users, success rate…) work without one. A one-word message gets the standard reply. The model can pick the wrong check or explainer; the answer is then about that one, never invented facts. `explain step 2` follows the last fix guide in the chat.
+- **No health or medical answers.** Agent Doctor checks AI agents, not people. Health and medicine questions get a fixed reply that points to a health professional (and to Agent Scout for health agents on Agentverse).
 - **Weights are our estimate.** Agentverse does not publish its ranking weights. The rubric follows the official docs' emphasis; the same input always gives the same score.
 - **Keywords are not checked yet.** Make sure each keyword appears in your README.
 - **Mainnet only.** Testnet agents are not checked.

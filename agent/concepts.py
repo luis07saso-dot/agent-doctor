@@ -86,7 +86,8 @@ CONCEPTS: dict[str, Concept] = {
         f"guide asks for at least {R.MIN_INTERACTIONS}. It says: \"Trigger your Agent with "
         "real or test prompts so usage signals can build.\"",
         "interactions",
-        r"\binteractions?\b"),  # Agentverse term (spec F3): no context word needed
+        "",
+        r"\binteractions?\b"),  # Q24: needs a context word ("drug interaction")
     "verified_chats": Concept(
         "Verified chats",
         "Agentverse's public profile data has two counts: recent verified conversations, and "
@@ -118,8 +119,8 @@ CONCEPTS: dict[str, Concept] = {
         "reply. The flag clears automatically the next time the agent answers a message, for "
         "example from a Testing run or a Manual Test.",
         "responsive",
-        r"\bunresponsive\b",  # Agentverse term (spec F3); plain "responsive" needs context
-        r"\bresponsive\b"),
+        "",
+        r"\b(?:un)?responsive\b"),  # Q24: needs a context word ("patient unresponsive")
     "active": Concept(
         "Active status",
         guides.GUIDE_WHY["active"],
@@ -233,9 +234,10 @@ _PATTERNS = tuple((k, re.compile(CONCEPTS[k].pattern, re.I | re.S)) for k in ORD
 _LOOSE = tuple((k, re.compile(CONCEPTS[k].loose, re.I | re.S)) for k in ORDER
                if CONCEPTS[k].loose)
 # A common word counts only next to one of these ("what is the rating" alone could be a movie).
+# Q24: no bare "doctor" (medical questions say it); "agent doctor" still counts via "agent".
 _CONTEXT = re.compile(
     r"\bagents?\b|\bagentverse\b|\basi:?\s?one\b|\basi1\b|\bbots?\b|\buagents?\b|\breadme\b|"
-    r"\bprofile\b|\bdoctor\b|\bscor\w*|\brank\w*|\baudit\w*|\bfix(?:es)?\b|\bsteps?\b|"
+    r"\bprofile\b|\bconversations?\b|\bchats?\b|\bscor\w*|\brank\w*|\baudit\w*|\bfix(?:es)?\b|\bsteps?\b|"
     r"\byou\s+(?:mean|meant|said|say|wrote|mentioned|told)\b|\bmarketplace\b|\bdashboard\b",
     re.I)
 
