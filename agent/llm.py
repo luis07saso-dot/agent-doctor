@@ -108,7 +108,10 @@ SYSTEM = (
     "\"fix\" = how to fix, improve, add or change it; \"general\" = a question about "
     "Agentverse, ASI:One, AI agents, ranking or the words Doctor used, not about one agent's "
     "data; \"other\" = small talk or anything not about agents, Agentverse, ASI:One or "
-    "Doctor.\n"
+    "Doctor. Rules, bans, terms of service, faking or buying traffic: ask \"general\", "
+    "concept \"fake_chats\". Pricing: \"other\".\n"
+    "check and topic stay \"none\" unless the message is about the audited agent itself "
+    "(its data or fixing it); a word like chats, users or ratings in passing is not enough.\n"
     "check: the audit check the message is about, or \"none\":\n"
     + "\n".join(f"- {k}: {v}" for k, v in _CHECK_HELP.items())
     + "\ntopic: a data question about the audited agent, or \"none\":\n"

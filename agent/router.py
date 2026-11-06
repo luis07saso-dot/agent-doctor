@@ -136,7 +136,43 @@ FAQ: dict[str, str] = {
         "Yes, Agent Doctor is free.\n\n" + _NEXT + " Then ask `how do I fix #1` for "
         "step-by-step help, or `is weather-bot live?` for a Pre-Hire Check."
     ),
+    # Q23 (prod 2026-11-05 "can i get banned for faking chats"). Source: fetch.ai/terms
+    # (effective 28 Sep 2026, covers agentverse.ai), re-read 2026-11-06: §10 "harm or falsify
+    # the Company's rating", §10/§12 robots / "automated manner", §22 suspend or terminate.
+    "rules": (
+        "**Can faking chats or traffic get you banned?** Yes, it's a real risk. Fetch.ai's Terms "
+        "of Service cover Agentverse. They ban actions that \"harm or falsify the Company's "
+        "rating\", and using bots or scripts to use the service in an automated way (§10, §12). "
+        "For a breach, Fetch.ai may suspend or close your account without notice (§22).\n\n"
+        "What works instead: a complete profile (README, Chat Protocol, handle, avatar), "
+        "staying online and answering fast, honest Testing runs, and real users.\n\n"
+        "For your agent's top 3 fixes: " + _NEXT[0].lower() + _NEXT[1:]
+    ),
 }
+# Q23: "rules" = asking about faking usage or getting banned. Strong cheat words alone; weaker
+# ones ("spam", "inflate") only with a risk word; or a plain "get banned" / "terms of service".
+_USAGE = (r"(?:chats?|conversations?|interactions?|traffic|users?|ratings?|reviews?|usage|messages?|"
+          r"accounts?|picks|impressions|activity|numbers|stats|metrics|success(?:\s+rate)?)")
+_CHEAT_STRONG = re.compile(
+    r"\b(?:(?:fak(?:e|es|ed|ing)|falsif\w*|buy(?:s|ing)?|bought|purchas\w*)\s+(?:\w+\s+){0,2}?"
+    + _USAGE + r"|fake\s+it|cheat(?:s|ed|ing)?|sock\s?puppets?|bot\s+traffic|"
+    r"gam(?:e|ing)\s+(?:the\s+)?(?:system|ranking|algorithm|rating|search))\b", re.I)
+_CHEAT_WEAK = re.compile(r"\b(?:spam\w*|inflat\w*|artificial\w*|self-?chat\w*|"
+                         r"alt(?:ernate)?\s+accounts?|(?:multiple|many|several|extra)\s+accounts)\b",
+                         re.I)
+_RISK = re.compile(r"\b(?:bann?(?:ed|s|ing)?|suspend\w*|terminat\w*|delist\w*|penali[sz]\w*|"
+                   r"punish\w*|get caught|allowed|against the (?:rules|terms|tos)|"
+                   r"violat\w*|breach\w*|break(?:s|ing)?|legal|illegal|risky|safe|ok(?:ay)? to|"
+                   r"can i|could i|should i)\b", re.I)
+_BAN = re.compile(r"\b(?:get|got|be|been|getting|gets)\s+(?:my\s+\w+\s+)?"
+                  r"(?:banned|suspended|terminated|delisted)\b", re.I)
+# "terms of service" alone is not enough: "how do I add a terms of service to my README".
+_TERMS = re.compile(r"\bterms of (?:service|use)\b|\btos\b", re.I)
+
+
+def _rules_question(text: str) -> bool:
+    return bool(_CHEAT_STRONG.search(text) or _BAN.search(text)
+                or ((_CHEAT_WEAK.search(text) or _TERMS.search(text)) and _RISK.search(text)))
 # Question patterns, checked in this order. A question about "my agent" with an address or
 # handle in it is an audit, not an FAQ (targets are checked first).
 _FAQ_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
@@ -158,7 +194,10 @@ _FAQ_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
 
 
 def faq_key(text: str) -> str:
-    """Which FAQ a message asks, or "" if none."""
+    """Which FAQ a message asks, or "" if none. Rules questions first: "can I fake chats to
+    rank higher?" is about the risk, not ranking tips."""
+    if _rules_question(text):
+        return "rules"
     return next((k for k, rx in _FAQ_PATTERNS if rx.search(text)), "")
 
 EXPLAIN_NONE = (
@@ -462,7 +501,10 @@ def scout_pick_short(n: int, count: int) -> str:
 
 _LEAD = (r"\b(?:find|search(?:\s+for)?|look(?:ing)?\s+for|need|want|recommend|suggest|"
          r"show\s+me|get\s+me|is\s+there|are\s+there|any|which|what|best|top|know(?:\s+of)?)\b")
-_FILL = r"(?:me|us|a|an|some|any|the|one|good|great|best|top|reliable|ai|really|other|new|free)"
+# "and" = the common typo of "an" (prod 2026-11-05: "find and agent to help me manage my finances"
+# got the help text).
+_FILL = (r"(?:me|us|a|an|and|some|any|the|one|good|great|best|top|reliable|ai|really|other|new|"
+         r"free)")
 _SNOUN = r"(?:agents?|bots?)\b"
 _VIA = (r"(?:\s+(?:should\s+i\s+(?:use|hire|pick)|do\s+you\s+recommend|would\s+you\s+recommend|"
         r"can\s+i\s+use|could\s+i\s+use|is\s+best|is\s+good|works\s+best))?")
@@ -522,7 +564,7 @@ def scout_query(text: str) -> Optional[str]:
             if _SCOUT_PREFIX_BAD.search(t[:m.start()]):
                 return None  # "audit any agent for me", "I want to check which agent..."
             return _capability(m.group("cap"))
-    if re.search(r"\b(?:find|recommend|suggest)\s+(?:me\s+)?(?:an?\s+|some\s+)?(?:good\s+)?"
+    if re.search(r"\b(?:find|recommend|suggest)\s+(?:me\s+)?(?:an?d?\s+|some\s+)?(?:good\s+)?"
                  + _SNOUN + r"\s*(?:on\s+agentverse)?\s*[?.!]*\s*$", t, re.I):
         return ""  # "find me an agent": a scout request without the what
     return None

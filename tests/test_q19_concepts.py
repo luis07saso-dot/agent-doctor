@@ -54,7 +54,7 @@ def test_off_topic_small_talk_still_refused(on, monkeypatch):  # noqa: F811
     ("what's a starter prompt?", "starter_prompts"),
     ("what does found and tip mean?", "found_tip"),
     ("what is ASI:One?", "asi_one"),
-    ("why shouldn't I script fake chats?", "fake_chats"),
+    ("what are scripted chats?", "fake_chats"),  # "fake chats" + why/can I = Q23 rules FAQ
     ("what is website verification?", "website"),
 ])
 def test_concept_questions_without_audit(text, key):
@@ -91,6 +91,11 @@ def test_other_routes_unchanged(text, kind):
 ])
 def test_common_words_need_agent_context(text, concept):
     assert (router.classify(text, ME).kind == "concept") is concept
+
+
+def test_rules_faq_beats_fake_chats_concept():
+    # Q23 (merged 2026-11-07): FAQs win over concepts; the rules FAQ is the fuller answer
+    assert router.classify("why shouldn't I script fake chats?", ME).key == "rules"
 
 
 def test_data_question_with_audit_stays_explain():

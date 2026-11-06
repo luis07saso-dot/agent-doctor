@@ -48,7 +48,7 @@ how is the score calculated?
 how can I rank higher on ASI:One?
 ```
 
-Quick answers, no agent needed: how the score works, what Agent Doctor checks, how to rank higher, and whether it's free.
+Quick answers, no agent needed: how the score works, what Agent Doctor checks, how to rank higher, whether it's free, and whether faking chats or traffic can get your agent banned (it can: Fetch.ai's Terms of Service).
 
 Example output:
 
@@ -219,7 +219,7 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **Data used**: public Agentverse endpoints only (agent search, agent profile, Almanac registration and handles). No private data, no logins.
 - **Privacy**: logs keep no message text, and sender IDs are hashed. A question the rules don't recognise is sent to the ASI:One API (Fetch.ai) with agent addresses, links, emails and long tokens removed, only to pick the topic; with it goes the text of the fix guide you last saw, if any, so "that step" can be understood. Nothing else is sent. Agent Scout sends your search words (not your message) to Agentverse search and keeps the last list per chat for 24 hours in memory, so `audit #2` works. To power fix guides, `why this score?` and the re-check diff, Agent Doctor stores the last agent audited or checked in a chat (24 hours) and the last score and pass/fail of each check per agent you checked (30 days, up to 20 agents). Keys are hashed; only public agent data (name, address, score, check results) is kept. Send `forget` to delete it.
 - **Reliability**: an error gets a short "try again" reply, never silence or a crash. Rate limits and a loop guard stop runaway agent-to-agent loops (a conversation that keeps flooding is paused for 24 hours). Runs 24/7 on a dedicated server with a watchdog and one-step rollback.
-- **Tested**: 1,321 automated tests, plus live checks on ASI:One.
+- **Tested**: 1,365 automated tests, plus live checks on ASI:One.
 
 ## Use cases
 
