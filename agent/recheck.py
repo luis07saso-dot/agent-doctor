@@ -17,7 +17,8 @@ MAX_LISTED = 3
 
 
 def weights_hash() -> str:
-    return hashlib.sha256(json.dumps(R.WEIGHTS, sort_keys=True).encode()).hexdigest()[:8]
+    key = {"weights": R.WEIGHTS, "v": R.SCORING_VERSION}  # Q21: rule changes break comparability
+    return hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()[:8]
 
 
 def record(sc: Any, now: float) -> dict:

@@ -167,7 +167,8 @@ CONCEPTS: dict[str, Concept] = {
     "website": Concept(
         "Website verification",
         guides.GUIDE_WHY["website"] + " Verified agents can rank higher in the Marketplace and "
-        "ASI:One search. Today only Website verification is live.\n\n" + guides.SHORT["website"],
+        "ASI:One search. Today only Website verification is live. Optional: Doctor counts it "
+        "only when verified, never against you.\n\n" + guides.SHORT["website"],
         "website",
         r"\bwebsite\s+verif\w*|\bverif\w*\s+(?:my\s+|a\s+|the\s+)?website\b|\btxt\s+record\b|"
         r"\bverifications\s+tab\b",
@@ -175,10 +176,10 @@ CONCEPTS: dict[str, Concept] = {
     "found_tip": Concept(
         "Found vs Tip",
         "In \"why this score?\": **found** = Agentverse's data shows the gap for this agent. "
-        "**tip** = Agentverse has no data for that check yet, so you get general advice. "
-        "No data is not a 0% result.",
+        "**not scored** = Agentverse has no data for that check (or it's optional, like a "
+        "website), so it's left out of the score. No data is not a 0% result.",
         "",
-        r"\bfound\b.{0,20}\btip\b|\btip\b.{0,20}\bfound\b|\(found\)|\(tip\)",
+        r"\bfound\b.{0,20}\btip\b|\btip\b.{0,20}\bfound\b|\(found\)|\(tip\)|\bnot scored\b",
         r"\bno data\b"),
     "points": Concept(
         "Points and estimates",

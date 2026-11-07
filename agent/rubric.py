@@ -9,7 +9,8 @@ estimates, ordered by the docs' emphasis:
 - Chat Protocol = boost, none = penalty; README = "primary" indexing document.
 - Handle, avatar ("slight" boost), description, >=10 interactions = listed factors.
 - Rating = recent + total interactions, successful ASI:One conversations, evaluations.
-- Website verification = "immediate" lift. Starter prompts: UX only (not a listed factor).
+- Website verification = "other signal" (not a core factor, never required): optional bonus,
+  counted only when verified (Q21, re-checked 2026-11-08). Starter prompts: UX only (not a listed factor).
 Not scored: keywords (GET /v1/search/agents/{addr}/target-keywords needs auth: 401).
 
 Field scales (sampled from 150 live search results): rating 0-5; recent_success_rate and
@@ -48,6 +49,9 @@ WEIGHTS: dict[str, float] = {
     "starter_prompts": 2,
 }
 assert sum(WEIGHTS.values()) == 100
+# Q21 (2026-11-08): no-data checks and a missing website are left out; score = points won /
+# points possible x 100. Bump when scoring changes so re-check diffs say "scoring changed".
+SCORING_VERSION = 2
 
 # README sections from the Agentverse README guidelines. A section counts as present if a
 # Markdown heading (outside code fences) has a word starting with any of its phrases

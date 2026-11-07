@@ -15,7 +15,8 @@ from agent.scorer import score
 FIX = Path(__file__).parent / "fixtures"
 FIXTURES = ["strong", "weak", "dead", "flagged"]
 ADDR = "agent1qfvydlgcxrvga2kqjxhj3hpngegtysm2c7uk48ywdue0kgvtc2f5cwhyffv"
-BASELINE_TOTALS = {"strong": 76, "weak": 45, "dead": 5, "flagged": 68}
+# Q21 (2026-11-08): no-data checks and a missing website left out -> share of points possible.
+BASELINE_TOTALS = {"strong": 83, "weak": 50, "dead": 6, "flagged": 74}
 
 
 def load(name) -> av.Lookup:
@@ -73,11 +74,12 @@ def test_full_marks_kind_ok():
     assert sc.check("active").kind == "ok" and sc.check("chat_protocol").kind == "ok"
 
 
-def test_found_fixes_before_tips():
-    fixes = score(load("strong")).fixes
-    kinds = [f.kind for f in fixes]
-    assert kinds == sorted(kinds, key=lambda k: k == "no_data")
-    assert fixes[-1].kind == "no_data"
+def test_unscored_checks_are_never_fixes():  # Q21 (FB-6)
+    sc = score(load("strong"))
+    assert all(f.kind == "found" for f in sc.fixes)
+    for rule in ("eval_rate", "success_rate"):
+        c = sc.check(rule)
+        assert c.kind == "no_data" and c.max_points == 0 and c.lost == 0
 
 
 def test_offline_still_first():
@@ -87,7 +89,8 @@ def test_offline_still_first():
 def test_unindexed_has_no_tips():
     lk = replace(load("strong"), profile=None, profile_status="not_found", outcome="partial")
     sc = score(lk)
-    assert all(c.kind in ("ok", "found") for c in sc.checks)
+    assert all(c.kind in ("ok", "found") for c in sc.checks if c.rule != "website")
+    assert sc.check("website").kind == "optional"
 
 
 # ---------- report ----------
@@ -109,17 +112,19 @@ def test_report_labels_found_and_tip():
 def test_report_tip_label_and_legend_only_with_tip():
     strong = load("strong")
     out = format_report(strong, score(strong))
-    assert "Tip = no data" not in out  # no Tip in strong's top 3
-    # Agent with only no-data gaps left: the tip shows up in the top 3.
+    assert "Tip" not in out
+    # Q21: only no-data gaps left -> full score, no fixes, no-data shown as not scored.
     perfect_but_data = with_profile("strong", handle="weather", readme=_full_readme(),
                                     rating=5.0, domain="example.com")
-    out = format_report(perfect_but_data, score(perfect_but_data))
-    assert "Tip: No success rate from Agentverse yet" in out and "Tip = no data" in out
+    sc = score(perfect_but_data)
+    out = format_report(perfect_but_data, sc)
+    assert sc.total == 100 and "No fixes needed" in out and "Tip" not in out
+    assert "❔ Not scored (no data): ASI:One success, Testing (none shared)" in out
 
 
 def test_report_no_data_wording():
     out = format_report(load("strong"), score(load("strong")))
-    assert "❔ No data: ASI:One success, Testing (none shared)" in out  # Q21/Q22a
+    assert "❔ Not scored (no data): ASI:One success, Testing (none shared)" in out  # Q21/Q22a
     assert "none yet" not in out
 
 
@@ -155,8 +160,8 @@ def _shown(name="strong"):
 
 def test_explain_lists_checks_and_legend():
     out = evidence.format_explain(_shown(), "why this score?")
-    assert out.startswith("**Why Weather scored 76/100")
-    assert "Success rate 0/4: no data (0 verified chats) (tip)" in out
+    assert out.startswith("**Why Weather scored 83/100")
+    assert "❔ Success rate: no data (0 verified chats) (not scored)" in out
     assert "✅ Full marks:" in out and "Found = the data shows a gap" in out
     assert "0%" not in out.split("Success rate", 1)[1].split("\n", 1)[0]
     assert len(out) <= MAX_CHARS
@@ -257,7 +262,7 @@ def test_explain_after_audit_uses_memory_no_lookup():
     run(service.handle(f"audit {ADDR}", c, chat_key="k"))
     n = len(c.calls)
     r = run(service.handle("why this score?", c, chat_key="k"))
-    assert r.outcome == "explain" and len(c.calls) == n and "scored 76/100" in r.text
+    assert r.outcome == "explain" and len(c.calls) == n and "scored 83/100" in r.text
 
 
 def test_explain_without_audit():

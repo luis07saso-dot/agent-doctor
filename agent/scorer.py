@@ -24,7 +24,8 @@ class Check:
     detail: str  # short, user-facing ("4.5/5", "missing", ...)
     fix: str  # what to do; empty when ok
     # Q10 (FB-2): ok = full marks; found = the data shows a gap; no_data = Agentverse gave no
-    # value (null). no_data still scores 0 (user decision 2026-11-03) but is shown as a Tip.
+    # value (null). Q21 (FB-6, user 2026-11-08): no_data and optional (website, docs call it
+    # an "other signal") are not scored: max_points 0, so never a fix and no points lost.
     kind: str = "found"
 
     @property
@@ -92,8 +93,11 @@ def score(lookup: Any) -> Score:
     ]
     assert [c.rule for c in checks] == list(R.WEIGHTS)
     if not indexed:  # no profile at all: that is the detected gap, so no "no data" tips
-        checks = [replace(c, kind="found") if c.kind == "no_data" else c for c in checks]
-    total = int(round(sum(c.points for c in checks)))
+        checks = [replace(c, kind="found", max_points=_w(c.rule)) if c.kind == "no_data" else c
+                  for c in checks]
+    # Q21: score = share of the points that could be judged (no data / optional left out).
+    possible = sum(c.max_points for c in checks)  # > 0: active + chat_protocol always scored
+    total = int(round(100 * sum(c.points for c in checks) / possible))
     total = max(0, min(100, total))
     down = not active
     verdict = R.DOWN_VERDICT if down else next(v for m, v in R.VERDICTS if total >= m)
@@ -114,6 +118,11 @@ def _mk(rule: str, frac: float, detail: str, fix: str, kind: str = "found") -> C
 
 
 NO_DATA = "no data"
+
+
+def _unscored(rule: str, detail: str, fix: str, kind: str) -> Check:
+    """Q21: a check we can't (no_data) or shouldn't (optional) count. 0 of 0 points."""
+    return Check(rule, 0.0, 0.0, False, detail, fix, kind)
 
 
 def _num(value: Any) -> bool:
@@ -210,7 +219,7 @@ def _readme(readme: str | None) -> Check:
 def _rating(rating: Any) -> Check:
     fix = "Raise rating: pass Agentverse Testing runs and get real ASI:One users"
     if not _num(rating):
-        return _mk("rating", 0, NO_DATA, fix, "no_data")
+        return _unscored("rating", NO_DATA, fix, "no_data")
     r = max(0.0, min(R.RATING_MAX, float(rating)))
     return _mk("rating", r / R.RATING_MAX, f"{r:g}/{R.RATING_MAX:g}", fix)
 
@@ -256,21 +265,24 @@ def _avatar(href: Any) -> Check:
 def _interactions(total: Any) -> Check:
     fix = f"Reach {R.MIN_INTERACTIONS}+ interactions (run Testing; share with real users)"
     if not (isinstance(total, int) and not isinstance(total, bool)):
-        return _mk("interactions", 0, NO_DATA, fix, "no_data")
+        return _unscored("interactions", NO_DATA, fix, "no_data")
     return _mk("interactions", 1 if total >= R.MIN_INTERACTIONS else 0, f"{total:,}", fix)
 
 
 def _rate(rule: str, value: Any, fix: str, no_data_fix: str) -> Check:
     if not _num(value):
-        return _mk(rule, 0, NO_DATA, no_data_fix, "no_data")
+        return _unscored(rule, NO_DATA, no_data_fix, "no_data")
     v = max(0.0, min(1.0, float(value)))
     return _mk(rule, v, f"{v:.0%}", fix)
 
 
 def _website(domain: Any) -> Check:
-    has = isinstance(domain, str) and bool(domain.strip())
-    return _mk("website", 1 if has else 0, domain if has else "none",
-               "Verify a website domain (Verifications tab, DNS TXT record)")
+    # Q21 (FB-6): optional. Docs list it under "other signals", not the core ranking factors,
+    # and never call it required. Verified = 3/3 counted; none = not counted, never a fix.
+    if isinstance(domain, str) and domain.strip():
+        return _mk("website", 1, domain, "")
+    return _unscored("website", "none", "Optional: verify a website domain (Verifications "
+                     "tab, DNS TXT record)", "optional")
 
 
 def _starter_prompts(prompts: Any) -> Check:

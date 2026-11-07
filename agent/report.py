@@ -110,9 +110,7 @@ def format_report(lookup: Any, sc: Score, live: Any = None, footer: str = "",
     # in "why this score?" and the README.
     hows = [short_how(fixes[0])] if fixes else []
 
-    details = ["", checks_line(sc, fixes, flagged)]
-    if any(f.kind == "no_data" for f in fixes):  # Q10: legend only when a Tip is listed
-        details.append("_Tip = no data from Agentverse, general advice._")
+    details = ["", checks_line(sc, fixes, flagged)]  # Q21: no-data checks are never fixes
     tail = ["", (ASK_FIXES if fixes else ASK_NO_FIXES)]
     if lookup.address:
         tail += ["", f"[Open profile on Agentverse]({PROFILE_URL.format(address=lookup.address)})"]
@@ -159,9 +157,10 @@ def checks_line(sc: Score, fixes: Any, flagged: bool = False) -> str:
     if not sc.check("active").ok:
         shown.add("responsive")  # offline: same cause as the Active fix
     full = sum(1 for ch in sc.checks if ch.ok)
+    judged = sum(1 for ch in sc.checks if ch.max_points > 0)
     found, no_data = [], []
     for ch in sc.checks:
-        if ch.ok or ch.rule in shown:
+        if ch.ok or ch.rule in shown or ch.kind == "optional":  # Q21: website not pushed
             continue
         if ch.kind == "no_data":
             no_data.append(_SHORT[ch.rule] + (" (none shared)" if ch.rule == "eval_rate" else ""))
@@ -170,11 +169,11 @@ def checks_line(sc: Score, fixes: Any, flagged: bool = False) -> str:
         else:
             val = f" {clean(ch.detail, 20)}" if ch.rule in _WITH_VALUE else ""
             found.append(_SHORT[ch.rule] + val)
-    parts = [f"✅ {full}/{len(sc.checks)} full marks"]
+    parts = [f"✅ {full}/{judged} full marks"]
     if found:
         parts.append(("❌ Also: " if fixes else "❌ ") + ", ".join(found))
     if no_data:
-        parts.append("❔ No data: " + ", ".join(no_data))
+        parts.append("❔ Not scored (no data): " + ", ".join(no_data))
     return "**Checks:** " + " · ".join(parts)
 
 

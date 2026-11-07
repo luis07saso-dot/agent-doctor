@@ -55,8 +55,9 @@ def test_checks_line_skips_what_top_fixes_say():
     # weak: no README -> one combined README fix; neither README rule repeats in the line
     assert "README" not in line
     assert "Description" not in line  # fix #3
-    assert "Avatar" in line and "Starter prompts 0" in line and "Website" in line
-    assert line.startswith("**Checks:** ✅ 5/14 full marks")
+    assert "Avatar" in line and "Starter prompts 0" in line
+    assert "Website" not in line  # Q21 (FB-6): optional, never pushed in the audit
+    assert line.startswith("**Checks:** ✅ 5/11 full marks")  # 11 judged (3 not scored)
 
 
 def test_checks_line_offline_does_not_repeat_responsive():
@@ -94,7 +95,7 @@ def test_explain_keeps_weights_and_keywords_note():
 def test_testing_tip_never_says_not_found():
     sc = score(load("strong"))
     c = sc.check("eval_rate")
-    assert c.kind == "no_data" and c.points == 0 and c.max_points == 4  # still scores 0
+    assert c.kind == "no_data" and c.points == 0 and c.max_points == 0  # Q21: not scored
     assert c.fix.startswith("Run Testing") and "Agentverse shares no recent Testing result" in c.fix
     assert "not found" not in c.fix.lower() and "No Testing score" not in c.fix
 
@@ -105,7 +106,7 @@ def test_testing_row_value_and_topic():
     assert next(r for r in rows if r.rule == "eval_rate").value == evidence.TESTING_NONE
     f = evidence.facts(lk.profile)
     text = " ".join(evidence._topics("testing score?", f, ()))
-    assert "your Testing tab may still have runs" in text and "scores 0 here" in text
+    assert "your Testing tab may still have runs" in text and "isn't counted in your score" in text
     f2 = dict(f, recent_eval_success_rate=0.8)
     assert "Testing score: 80%" in " ".join(evidence._topics("testing score?", f2, ()))
 
@@ -117,3 +118,43 @@ def test_testing_guide_says_scores_can_lag():
 
 
 from tests.test_explain import _full_readme  # noqa: E402  (same README the Q10 tests use)
+
+
+# ---------- Q21 v2 (2026-11-08, FB-6 again via Slack): not scored ----------
+
+def _perfect(**kw):
+    base = dict(handle="weather", readme=_full_readme(), rating=5.0,
+                recent_success_rate=1.0, recent_eval_success_rate=1.0)
+    return with_profile("strong", **{**base, **kw})
+
+
+def test_missing_website_never_lowers_score():
+    none, verified = score(_perfect(domain=None)), score(_perfect(domain="example.com"))
+    assert none.total == verified.total == 100
+    w = none.check("website")
+    assert w.kind == "optional" and w.max_points == 0 and w.lost == 0
+    assert "website" not in {f.rule for f in none.fixes}
+    assert verified.check("website").ok and verified.check("website").points == 3
+
+
+def test_null_testing_does_not_lower_score():
+    a = score(_perfect(recent_eval_success_rate=None))
+    assert a.total == 100 and not a.fixes
+
+
+def test_low_testing_still_counts():
+    assert score(_perfect(recent_eval_success_rate=0.0)).total == 96
+
+
+def test_explain_rows_show_not_scored():
+    lk = load("strong")
+    out = evidence.format_explain(service.shown_for(lk, score(lk), "Weather"), "why this score?")
+    assert "❔ Evaluation success rate: none shared by Agentverse (not scored)" in out
+    assert "/0" not in out
+
+
+def test_scoring_version_breaks_comparability():
+    from agent import recheck, rubric
+    assert rubric.SCORING_VERSION == 2
+    assert recheck.compare({"at": 0, "w": "old", "total": 76, "checks": {}},
+                           score(load("strong")), 60).comparable is False

@@ -15,7 +15,7 @@ It is built for agent builders asking "why is nobody finding my agent?". Think o
 - **Top 3 fixes ranked by impact**, each with the points it would add and how to do it, with an example.
 - **Step-by-step fix guides**: after an audit, ask `how do I fix #1` (or #2, #3) for the exact steps, where to click on Agentverse and a copy-paste example.
 - **Agent README review**: checks the README exists, is long enough to be indexed, and has the six recommended sections (Summary, Key features, Usage, Use cases, Limitations, Metadata).
-- **Agentverse ranking checks**: active status, Chat Protocol, @handle, avatar, description, starter prompts, rating, interactions, ASI:One success rate, Testing results and website verification.
+- **Agentverse ranking checks**: active status, Chat Protocol, @handle, avatar, description, starter prompts, rating, interactions, ASI:One success rate, Testing results, and website verification as an optional bonus (never a penalty).
 - **ASI:One search visibility**: flags offline or unresponsive agents. Inactive agents are left out of ranking.
 - **Same input, same output**: rule-based scoring, no LLM guesswork. Results cached for 5 minutes.
 - **Ask about the audit in your own words**: after an audit, questions like "it has 769 chats, why do you say get real users?" or "how can I improve the avatar" get an answer from that audit's data. A small model only picks which check or topic you mean; every number and sentence comes from the audit.
@@ -23,7 +23,7 @@ It is built for agent builders asking "why is nobody finding my agent?". Think o
 - **Free**. Quick answers take about a second. An audit also runs up to 3 Agentverse searches and a live test (one test message to the agent), and waits at most 8 seconds for them. Replies that include a live test take up to 15 seconds.
 - **Live test in every single-agent audit**: Agent Doctor messages the audited agent once and shows whether it answered (`✅ Live test: it answered our test message in 2.4s`). It never changes the score. Audit, Pre-Hire Check and Agent Scout share one live-test cache, so `is my-weather-bot live?` right after an audit answers at once.
 - **Pre-Hire Check (live test)**: ask `is my-weather-bot live?` and Agent Doctor sends that agent one test message, times its acknowledgement and answer, and adds its rating and profile score. Other agents can call it too (see "For agents").
-- **Why this score?**: after an audit, ask `why this score?` to see the data behind each check. A check Agentverse has no data for shows "no data" (0 points), not a failure.
+- **Why this score?**: after an audit, ask `why this score?` to see the data behind each check. A check Agentverse has no data for shows "not scored" and is left out of the score, not counted as a failure.
 - **Findability test**: searches Agentverse for up to 3 of the agent's own starter prompts and shows where it ranks in the top 50, so you see whether users typing those words can find it.
 - **Re-check diff**: say `re-check` (or `check it again`) and Agent Doctor audits the last agent again, no need to paste its address. You see the score change since the last check, with what was fixed and what is new.
 - **Agent Scout (find an agent)**: ask `find an agent that books flights`. Agent Doctor searches Agentverse for active, responsive agents with the Chat Protocol, scores the top 5, live-tests the best 2 matches and picks one, with reasons. Then `audit #2` or `is #3 live?`.
@@ -55,7 +55,7 @@ Example output:
 
 ```text
 Agent Doctor: Weather Bot (@my-weather-bot)
-Score 45/100 · Needs work
+Score 50/100 · Needs work
 
 Top fixes
 1. Found: Write a Markdown README with sections: Summary, Key features, Usage,
@@ -64,8 +64,8 @@ Top fixes
 2. Found: Raise rating: pass Agentverse Testing runs and get real ASI:One users (+8.4 pts)
 3. Found: Add a one-line Agent Description (+6 pts)
 
-Checks: ✅ 5/14 full marks · ❌ Also: Avatar, Website, Starter prompts 0 ·
-❔ No data: ASI:One success, Testing (none shared)
+Checks: ✅ 5/11 full marks · ❌ Also: Avatar, Starter prompts 0 ·
+❔ Not scored (no data): ASI:One success, Testing (none shared)
 
 Ask "how do I fix #1", "why this score?" or "re-check" after changes.
 
@@ -236,8 +236,9 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **Re-check diff needs an earlier check.** It compares with your last complete check of the same agent in the past 30 days.
 - **Follow-up questions about an agent's data need an audit in the same chat.** Questions about Agentverse words (Testing runs, real users, success rate…) work without one. A one-word message gets the standard reply. The model can pick the wrong check or explainer; the answer is then about that one, never invented facts. `explain step 2` follows the last fix guide in the chat.
 - **No health or medical answers.** Agent Doctor checks AI agents, not people. Health and medicine questions get a fixed reply that points to a health professional (and to Agent Scout for health agents on Agentverse).
-- **Weights are our estimate.** Agentverse does not publish its ranking weights. The rubric follows the official docs' emphasis; the same input always gives the same score.
-- **Testing results: only what Agentverse shares.** Its public data often has no recent Testing result, even when the owner has runs in the Testing tab. A missing result scores 0 and shows as a Tip, never as "not found".
+- **Website verification is optional.** Agentverse lists it as an "other signal", not a core ranking factor. A verified domain adds points; no domain costs nothing.
+- **Weights are our estimate.** Agentverse does not publish its ranking weights. Score = points won / points possible, so checks with no data are left out. The rubric follows the official docs' emphasis; the same input always gives the same score.
+- **Testing results: only what Agentverse shares.** Its public data often has no recent Testing result, even when the owner has runs in the Testing tab. A missing result is not scored (left out of the score), never shown as "not found". Same for any other check Agentverse has no data for.
 - **Keywords are not checked yet.** Make sure each keyword appears in your README.
 - **Mainnet only.** Testnet agents are not checked.
 - **One agent per message.** Only the first agent in a message is audited.
@@ -257,6 +258,6 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **Data sources**: public Agentverse search and Almanac APIs
 - **Privacy**: logs keep no message text; sender IDs are hashed; `forget` deletes stored audits
 - **Price**: free
-- **Version**: 0.13.0
+- **Version**: 0.14.0
 - **Maintainer**: [leedr.tech](https://leedr.tech)
 - **Built for**: Stranger Builds hackathon, Fetch.ai track

@@ -108,7 +108,7 @@ _T_SUCCESS = re.compile(r"\bsuccess\w*|\basi:?\s?one\b|\basi1\b", re.I)
 _T_RATING = re.compile(r"\brating\b|\brated\b|\bstars?\b", re.I)
 _T_TESTING = re.compile(r"\btest(?:ing|s)?\b|\bevals?\b|\bevaluations?\b", re.I)
 
-LEGEND = "Found = the data shows a gap. Tip = no data, general advice."
+LEGEND = "Found = the data shows a gap. Not scored = no data from Agentverse, or optional."
 
 
 def _counts(f: dict) -> str:
@@ -167,17 +167,22 @@ def _topics(text: str, f: dict, extra: tuple[str, ...] = ()) -> list[str]:
         if e is None:  # Q21 (FB-6): never "not found"; the owner's Testing tab may have runs
             out.append("Testing score: Agentverse shares no recent Testing result for this agent "
                        "(most agents we checked have none). It doesn't say which runs it shares "
-                       "or when, so your Testing tab may still have runs. It scores 0 here "
-                       "until Agentverse shares one.")
+                       "or when, so your Testing tab may still have runs. It isn't counted "
+                       "in your score until Agentverse shares one.")
         else:
             out.append(f"Testing score: {_pct(e)}. Agentverse doesn't say which runs it counts.")
     return out
+
+
+_UNSCORED = {"no_data": "not scored", "optional": "optional, not scored"}
 
 
 def row_line(r: Row) -> str:
     """One evidence line: "❌ Rating 1.2/10: 1.8/5 (found)"."""
     if r.kind == "ok":
         return f"✅ {r.label} {_pts(r.points)}/{_pts(r.max_points)}: {r.value} (full marks)"
+    if r.kind in _UNSCORED:  # Q21: 0 of 0 points, so no points shown
+        return f"{'❔' if r.kind == 'no_data' else '➕'} {r.label}: {r.value} ({_UNSCORED[r.kind]})"
     return (f"{'❔' if r.kind == 'no_data' else '❌'} {r.label} {_pts(r.points)}/{_pts(r.max_points)}: "
             f"{r.value} ({'tip' if r.kind == 'no_data' else 'found'})")
 
@@ -200,7 +205,7 @@ def format_explain(shown: Any, text: str, extra_topics: tuple[str, ...] = (),
         head += [""] + [p for t in topics_ for p in (t, "")][:-1]
     order = list(R.WEIGHTS)
     lost = sorted((r for r in shown.rows if r.kind != "ok" and r is not focus_row),
-                  key=lambda r: (r.kind == "no_data", order.index(r.rule)))
+                  key=lambda r: (r.kind in _UNSCORED, order.index(r.rule)))
     lines = [row_line(r) for r in lost]
     full = [r.label for r in shown.rows if r.kind == "ok" and r is not focus_row]
     if full:
@@ -220,6 +225,10 @@ def focus_reply(shown: Any, row: Row) -> str:
     from the remembered audit row and fixed How texts only."""
     if row.kind == "ok":
         body = f"**{row.label}** for {shown.name}: full marks ({row.value}), nothing to fix."
+    elif row.kind in _UNSCORED:
+        how = guides.SHORT.get(row.rule) or guides.README_HOW
+        body = (f"**{row.label}** for {shown.name}: {row.value} ({_UNSCORED[row.kind]}). "
+                f"It doesn't change the score.\n\n{how}")
     else:
         how = guides.SHORT.get(row.rule) or guides.README_HOW
         body = (f"**{row.label}** for {shown.name}: {_pts(row.points)}/{_pts(row.max_points)}, "

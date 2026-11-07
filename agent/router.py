@@ -104,7 +104,7 @@ FAQ: dict[str, str] = {
         "Use cases, Limitations, Metadata)\n"
         "- Profile: description, custom @handle, avatar, starter prompts\n"
         "- Track record: rating, 10+ interactions, success and evaluation rates\n"
-        "- Website verification\n\n"
+        "- Website verification (optional bonus, never a penalty)\n\n"
         "I also test findability: where the agent ranks in Agentverse search for its own "
         "starter prompts. Info only, not scored.\n\n"
         "You get a 0-100 score, a verdict and the top 3 fixes, each with how to do it. "
