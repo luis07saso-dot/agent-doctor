@@ -393,6 +393,20 @@ _STRONG_EXPLAIN = re.compile(r"\bthis score\b|\bwhy\b.{0,40}\bscor\w*|\bunique u
 _LONG_TARGET = re.compile(r"https?://\S+|(?<![0-9a-z])agent1[0-9a-z]{20,}", re.IGNORECASE)
 
 
+# "why this score?" / "why is my score so low?": the whole breakdown, never a model guess.
+# Smoke 2026-11-08: the LLM mapped the HELP's own "why this score?" to the Points concept.
+_WHOLE_SCORE = re.compile(
+    r"^\W*(?:so\s+)?(?:why|explain|how\s+come)\b"
+    r"(?:\s+(?:is|was|did|does|do|i|it|we|you|get|got|give|gave|me|us))*"
+    r"\s+(?:this|my|the|its|that|our|a)\s+score\b"
+    r"(?:\s+(?:so\s+)?(?:low|high|bad|good))?\W*$", re.IGNORECASE)
+
+
+def whole_score(text: str) -> bool:
+    """A question about the whole score, with no check or topic named. Mentions ignored."""
+    return bool(_WHOLE_SCORE.search(re.sub(r"@\S+", " ", text or "")))
+
+
 def explain_wanted(text: str) -> bool:
     # A 65-char address must not break the ".{0,40}" windows ("why is agent1q… scored low?").
     text = _LONG_TARGET.sub("X", text)

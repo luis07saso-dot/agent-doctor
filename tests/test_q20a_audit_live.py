@@ -55,7 +55,7 @@ def test_multi_target_audit_does_not_probe():
     probe, calls = prober()
     res = audit(f"audit {STRONG} and {WEAK}", probe)
     assert calls == [] and res.live == service.LIVE_MULTI
-    assert '_Live test: ask "is ' in res.text
+    assert f"_Live test: ask `is {STRONG} live?` to test it._" in res.text  # address -> code
 
 
 def test_kill_switch(monkeypatch):
@@ -71,7 +71,7 @@ def test_slow_probe_reports_pending(monkeypatch):
     probe, calls = prober(delay=1.0)
     res = audit(f"audit {STRONG}", probe)
     assert len(calls) == 1 and res.live == "pending"
-    assert "⏳ Live test still running: ask \"is" in res.text and "live?\" in a minute" in res.text
+    assert f"⏳ Live test still running: ask `is {STRONG} live?` in a minute" in res.text
 
 
 def test_no_time_left_still_starts_the_probe(monkeypatch):

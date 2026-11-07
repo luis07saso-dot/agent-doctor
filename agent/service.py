@@ -448,7 +448,8 @@ async def _followup(text: str, chat_key: str, rules: Result, kind: str) -> Resul
             return rules
         if kind == "help" and router.is_greeting(text):
             return rules
-        if (kind == "explain" and evidence.topics(text)) or router.faq_key(text):
+        if (kind == "explain" and (evidence.topics(text) or router.whole_score(text))) \
+                or router.faq_key(text):
             return rules  # the rules already know what it's about
         f, label = await llm.MAPPER.map(text, chat_key, _llm_context(chat_key, shown))
         if f is None or label != "used":

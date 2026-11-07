@@ -209,7 +209,8 @@ def live_line(live: Any, ask: str = "") -> str:
     """Q20a: live test of a non-flagged agent (we sent it one chat message). Info only, never
     scored. `live` = ProbeResult or "pending" | "capped" | "multi" (agent/service.py)."""
     status = live if isinstance(live, str) else getattr(live, "status", None)
-    q = f"\"is {ask or 'this agent'} live?\""
+    # An address is ~66 chars: as code it is copyable and doesn't wrap mid-word (smoke 2026-11-08)
+    q = f"`is {ask} live?`" if ask.startswith("agent1") else f"\"is {ask or 'this agent'} live?\""
     if status == "live":
         reply_ms = getattr(live, "reply_ms", None)
         took = f" in {reply_ms / 1000:.1f}s" if isinstance(reply_ms, (int, float)) else ""

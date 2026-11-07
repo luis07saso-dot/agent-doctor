@@ -33,13 +33,13 @@ _HANDLE_HOSTS = ("agentverse.ai", "asi1.ai")
 # backtracking to a shorter prefix), then validated against the Agentverse handle pattern,
 # so "@foo_bar", "@foo-" and "@example.com" are rejected rather than read as "@foo".
 _HANDLE = re.compile(r"(?<![A-Za-z0-9._%+\-/@])@([A-Za-z0-9_-]++)(?!@|\.[A-Za-z0-9])")
-# Bare handle: audit word, up to 3 filler words, then a hyphenated handle-shaped token (no
-# "@": @handles are step 3). Hyphen required so plain words ("audit agentbuilder", "check
+# Bare handle: audit word, up to 3 filler words, then a hyphenated handle-shaped token, "@"
+# optional (other @handles are step 3; this also catches our own). Hyphen required so plain words ("audit agentbuilder", "check
 # this") are never read as handles. Token not glued to "_", "@", "-" or a ".tld".
 _BARE_HANDLE = re.compile(
     r"\b(?:audit|check|scan|review|score|rate|grade|analy[sz]e|diagnose|inspect|test|probe|ping)\b"
     r"(?:[\s:,]+(?:the|this|that|my|our|out|agent|handle|called|named|please|on|agentverse)\b){0,3}"
-    r"[\s:,]+([a-z0-9]++(?:-[a-z0-9]++)++)(?![A-Za-z0-9_@-]|\.[A-Za-z0-9])",
+    r"[\s:,]+@?([a-z0-9]++(?:-[a-z0-9]++)++)(?![A-Za-z0-9_@-]|\.[A-Za-z0-9])",
     re.IGNORECASE,
 )
 # "is weather-bot live?" (Pre-Hire Check wording): hyphenated handle between "is" and a
@@ -144,8 +144,10 @@ def extract(text: str, ignore_handles: Iterable[str] = (),
     for m in _HANDLE.finditer(masked_text):
         _add_handle(found, m.start(), m.group(1), ignore)
 
-    # 4. Bare handles after an audit word. Not filtered by `ignore`: ASI:One adds
-    #    "@agent-doctor", but a typed "audit agent-doctor" is a real self-audit request.
+    # 4. Handles after an audit word ("audit weather-bot", "audit @agent-doctor"). Not filtered
+    #    by `ignore`: ASI:One puts "@agent-doctor" BEFORE the text as its mention of us, but
+    #    "audit agent-doctor" / "audit @agent-doctor" is a real self-audit request (smoke
+    #    2026-11-08: "@agent-doctor audit @agent-doctor" got off_scope).
     for m in _BARE_HANDLE.finditer(masked_text):
         _add_handle(found, m.start(1), m.group(1), set(_NOT_HANDLES))
     for m in _LIVE_HANDLE.finditer(masked_text):
