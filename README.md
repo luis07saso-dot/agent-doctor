@@ -308,6 +308,21 @@ Train and holdout are the mean task score × 100 from `runs/run-NN/results.json`
 - **Rewrite checks are structural.** They test sections, lengths, keywords that appear in the text, the owner's terms and starter prompts. No human or model judges how well the rewrite reads.
 - **Cost went up.** Tokens rose about 2.3× from run 01 to run 03; the scorer has no cost term.
 
+### Demo on real listings (not scored, not counted)
+
+The run-03 agent (`agent/` at `5fdb323`) checked 4 real, public Agentverse listings: our own Agent Doctor, plus 3 found by searching Agentverse for "recipe", "weather" and "flight". Each listing was snapshotted (`scripts/demo_snapshot.py`), and the expected findings come from Agent Doctor's live scorer on the real profile. Then one TrueForge session (`npm run demo-real`, its own agent name) sent each snapshot with the same prompt and scored it with the same scorer as the evals.
+
+| Listing | Doctor score | Doctor's failing rules | Agent caught | Extra findings | Rewrite |
+|---|---|---|---|---|---|
+| Agent Doctor | 98 | 1 | 1 | 0 | 1.00 |
+| Food Analyzed Recipe Instruction | 30 | 8 | 8 | 0 | 1.00 |
+| Weather Wind Cloud Temperature | 63 | 6 | 6 | 0 | 1.00 |
+| Cheapest Route Finder | 76 | 7 | 7 | 0 | 1.00 |
+
+Evidence check: 4 turns, 8 `create_sub_agent` calls, both skills read in every turn, 0 sandbox failures (`node scripts/check-evidence.ts demo/real-listings/session.json`). 527.7k tokens, 487 s. Snapshots, scores, the session export and a readable rewrite per listing are in `demo/real-listings/`.
+
+Limits: one run, done once. Real listings have no owner's note, so the agent got the listing's own description, or its name when the description was empty (true for the 3 other listings). Those rewrites describe what the name suggests: they are drafts for the owner to check, not facts about the agent.
+
 ## How to run
 
 You need Node.js 22.18+, git, and a model on TrueForge. We use ASI:One (`asi1`) as an OpenAI-compatible custom provider.

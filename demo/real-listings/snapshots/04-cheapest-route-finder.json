@@ -1,0 +1,54 @@
+{
+  "id": "04-cheapest-route-finder",
+  "title": "Cheapest Route Finder",
+  "holdout": false,
+  "profile": {
+    "name": "Cheapest Route Finder",
+    "handle": "",
+    "description": "",
+    "readme": "![tag:innovagtionlab](https://img.shields.io/badge/innovationlab-2R0BD7)\n![tag:spotlight](https://img.shields.io/badge/spotlight-FF6A00)\n![tag:websearch](https://img.shields.io/badge/web_search-4C8BD3)\n![tag:routes](https://img.shields.io/badge/routes-2R0BD7)\n![tag:chatprotocol](https://img.shields.io/badge/chatprotocol-1D3BD4)\n![tag:transport](https://img.shields.io/badge/transport-5D1BD9)\n\n# :motorway: Route Price & Time Compare Agent (Web-Search Only)\n\nA plain‑English travel helper that checks the web for car, train, bus, and flight options between two places and highlights the cheapest overall. No maps or booking APIs — just up‑to‑date info gathered from public sites.\n\n---\n\n## :check_mark_button: Sample Requests\n\n```\nPlease provide me cheapest route for Rome to Milan\n```\n\n- City ↔ City or Place ↔ Place\n  - “Rome to Milan”\n  - “Piccadilly Circus to Wembley Stadium”\n  - “Jaipur to Mumbai on 2025-08-27”\n- Compare four travel modes side‑by‑side\n  - Car: distance, typical drive time, rough fuel/toll cost\n  - Train: indicative fare & duration\n  - Bus: indicative fare & duration\n  - Flight: indicative fare & air time (direct if visible)\n- Date‑aware lookups\n  - Accepts “today”, “tomorrow”, or specific dates (YYYY‑MM‑DD)\n  - Defaults to “today” if not specified\n- Clear, consistent summary\n  - Normalized costs (e.g., “From £9” → 9.00 GBP)\n  - Distances in km and durations in hours/mins\n  - One‑line “Cheapest overall” pick\n\n---\n\n## :cross_mark: What It Won’t Do\n\n- Book tickets or show live seat availability\n- Guarantee prices (indicative from public sources)\n- Show live flight status or delays\n- Use Maps/Amadeus/private databases\n\n---\n\n## :speaking_head: Example Prompts\n\n| Prompt | Why it Works |\n|---|---|\n| “All options Rome to Milan” | Route is clear |\n| “Jaipur to Mumbai on 2025-08-27” | Route + date |\n| “London to Paris tomorrow, show cheapest” | Adds a preference |\n| “Piccadilly Circus to Wembley Stadium” | Landmark‑to‑landmark |\n| “Berlin to Prague, include flights” | Explicit mode |\n\n---\n\n## :globe_showing_europe_africa: Supported Scenarios\n\n- Domestic & cross‑border city pairs (e.g., London ↔ Paris, Rome ↔ Milan)\n- Within‑city landmarks (stadium, station, attraction)\n- Long‑haul city pairs when flights are relevant\n\n---\n\n## :information: Tips for Best Results\n\n1. Include both endpoints (“Rome to Milan”).\n2. Add a date for more relevant ranges (“today”, “tomorrow”, or YYYY‑MM‑DD).\n3. Say “all modes” or name the ones you care about.\n4. Mention currency if you prefer one (GBP/EUR/USD/INR).\n5. Ask for “cheapest overall” if budget matters most.\n6. Add constraints like “direct train only” or “no flights”.\n\n---\n\n## :counterclockwise_arrows_button: Handy Follow‑Ups\n\n- “What about tomorrow?”\n- “Show evening departures only.”\n- “Exclude flights.”\n- “Sort by fastest.”\n- “Re‑run for Paris to Lyon same day.”\n\n---\n\n## :bullseye: What You’ll Get (Sample)\n\n```\nCheapest options from Rome to Milan (web):\n- Car: 573 km, 5.8 h, ~120.00 EUR\n- Train: 28.00 EUR, 2.9 h\n- Bus: 9.00 EUR, 7.1 h\n- Flight: 48.00 EUR, 1.2 h\nCheapest overall: bus — 9.00 EUR\n```\n\nData is sourced from public web pages and aggregators; treat as indicative.\n\n---\n\n## :magnifying_glass_tilted_right: Notes & Limits\n\n- Results depend on what’s publicly visible for your route/date.\n- Some modes may be missing/partial if data isn’t obvious on the web.\n- Fares vary by time/operator/promotions; verify before booking.\n- Driving distances/costs are estimates (fuel, tolls, parking vary).\n\n---\n\n## :rocket: Powered By\n\n- OpenAI Responses API (`gpt-4o-mini`) with `web_search_preview` for fresh info\n- Normalization & summarization to keep results comparable\n- Structured extraction (LLM) for parsing user intent, including “today/tomorrow”\n\n---\n\n## :light_bulb: Use Cases\n\n- Quick budget vs time trade‑off checks\n- Weekend trips with flexible modes\n- First‑pass planning before deep booking research\n- Landmark‑to‑landmark hops inside big cities\n\n---\n\n## :electric_plug: How It Works (Brief)\n\n1. The chat handler extracts origin, destination, and date using structured output (LLM).\n2. The agent queries the web via `web_search_preview` to gather mode‑specific snippets.\n3. It normalizes currency, distance, and duration into a consistent schema.\n4. It returns a clean text summary with a cheapest pick.\n\n---",
+    "avatar": true,
+    "chat_protocol": true,
+    "status": "active",
+    "unresponsive": false,
+    "rating": 4.5,
+    "total_interactions": 39638,
+    "recent_success_rate": 0.8085114511144007,
+    "recent_verified_interactions": 123,
+    "recent_eval_success_rate": 0.8420348151936627,
+    "domain": null,
+    "starter_prompts": []
+  },
+  "job": "Cheapest Route Finder",
+  "must_keep": [],
+  "expected": [
+    {
+      "rule": "readme_sections",
+      "why": "3/6 sections: Add README sections: Key features, Limitations, Metadata"
+    },
+    {
+      "rule": "rating",
+      "why": "4.5/5: Raise rating: pass Agentverse Testing runs and get real ASI:One users"
+    },
+    {
+      "rule": "description",
+      "why": "missing: Add a one-line Agent Description"
+    },
+    {
+      "rule": "handle",
+      "why": "none: Set a custom @handle (max 20 chars) close to the agent's job"
+    },
+    {
+      "rule": "success_rate",
+      "why": "81%: Get real users chatting via ASI:One; answer every in-scope question well"
+    },
+    {
+      "rule": "eval_rate",
+      "why": "84%: Run Agentverse Testing (Testing tab) with real in-scope questions"
+    },
+    {
+      "rule": "starter_prompts",
+      "why": "0: Add 2-4 starter prompts that match your README"
+    }
+  ]
+}

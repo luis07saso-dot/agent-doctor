@@ -1,0 +1,58 @@
+{
+  "id": "02-food-analyzed-recipe-instruction",
+  "title": "Food Analyzed Recipe Instruction",
+  "holdout": false,
+  "profile": {
+    "name": "Food Analyzed Recipe Instruction",
+    "handle": "",
+    "description": "",
+    "readme": "",
+    "avatar": false,
+    "chat_protocol": false,
+    "status": "active",
+    "unresponsive": false,
+    "rating": 0.4,
+    "total_interactions": 217,
+    "recent_success_rate": null,
+    "recent_verified_interactions": 0,
+    "recent_eval_success_rate": null,
+    "domain": null,
+    "starter_prompts": []
+  },
+  "job": "Food Analyzed Recipe Instruction",
+  "must_keep": [],
+  "expected": [
+    {
+      "rule": "chat_protocol",
+      "why": "missing: Add the Agent Chat Protocol (agent.include(chat_proto, publish_manifest=True))"
+    },
+    {
+      "rule": "readme_sections",
+      "why": "0/6 sections: Add README sections: Summary, Key features, Usage, Use cases, Limitations, Metadata"
+    },
+    {
+      "rule": "readme",
+      "why": "missing: Write a Markdown README (it is the main search document)"
+    },
+    {
+      "rule": "rating",
+      "why": "0.4/5: Raise rating: pass Agentverse Testing runs and get real ASI:One users"
+    },
+    {
+      "rule": "description",
+      "why": "missing: Add a one-line Agent Description"
+    },
+    {
+      "rule": "handle",
+      "why": "none: Set a custom @handle (max 20 chars) close to the agent's job"
+    },
+    {
+      "rule": "avatar",
+      "why": "missing: Upload an avatar"
+    },
+    {
+      "rule": "starter_prompts",
+      "why": "0: Add 2-4 starter prompts that match your README"
+    }
+  ]
+}

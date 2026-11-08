@@ -11,6 +11,7 @@
   "scripts": {
     "setup": "node scripts/setup.ts",
     "run-evals": "node scripts/run-evals.ts",
+    "demo-real": "node scripts/demo-real.ts",
     "improve": "node scripts/improve.ts",
     "export-session": "node scripts/export-session.ts",
     "score": "node evals/score.ts",

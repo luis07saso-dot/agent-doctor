@@ -1,0 +1,50 @@
+{
+  "id": "03-weather-wind-cloud-temperature",
+  "title": "Weather Wind Cloud Temperature",
+  "holdout": false,
+  "profile": {
+    "name": "Weather Wind Cloud Temperature",
+    "handle": "",
+    "description": "",
+    "readme": "The Fetch.ai Weather Wind Cloud Temperature Agent is a smart autonomous digital agent designed to provide current weather, weather forecast and geocoding services (translating city names to geological coordinates). The maximum weather forecast length is 5 days with 3 hour steps.\n\nAvailable physical units for current weather and weather forecast:\n\n- Temperature in celsius\n- Wind speed in meters per second\n- Cloud coverage in %\n\n\nExamples of usage:\n\n- What is the current weather in Bratislava?\n- Give me the weather forecast for tomorrow for Kosice.\n- Give me the coordinates of Paris?\n- What is the current weather in the place with coordinates 42.0, 19.1 ?\n- \n\nData sources:\nhttps://api.openweathermap.org/\n",
+    "avatar": true,
+    "chat_protocol": true,
+    "status": "active",
+    "unresponsive": true,
+    "rating": 4.5,
+    "total_interactions": 57908,
+    "recent_success_rate": null,
+    "recent_verified_interactions": 0,
+    "recent_eval_success_rate": null,
+    "domain": null,
+    "starter_prompts": []
+  },
+  "job": "Weather Wind Cloud Temperature",
+  "must_keep": [],
+  "expected": [
+    {
+      "rule": "readme_sections",
+      "why": "1/6 sections: Add README sections: Key features, Usage, Use cases, Limitations, Metadata"
+    },
+    {
+      "rule": "rating",
+      "why": "4.5/5: Raise rating: pass Agentverse Testing runs and get real ASI:One users"
+    },
+    {
+      "rule": "description",
+      "why": "missing: Add a one-line Agent Description"
+    },
+    {
+      "rule": "responsive",
+      "why": "Agentverse flag: Clear Agentverse's \"unresponsive\" flag: reply fast to every chat"
+    },
+    {
+      "rule": "handle",
+      "why": "none: Set a custom @handle (max 20 chars) close to the agent's job"
+    },
+    {
+      "rule": "starter_prompts",
+      "why": "0: Add 2-4 starter prompts that match your README"
+    }
+  ]
+}
