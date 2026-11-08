@@ -261,3 +261,44 @@ Agent Scout: Agentverse search (active, responsive, Chat Protocol) → top 5 →
 - **Version**: 0.14.0
 - **Maintainer**: [leedr.tech](https://leedr.tech)
 - **Built for**: Stranger Builds hackathon, Fetch.ai track
+
+## Agent Doctor on TrueForge
+
+The same Agent Doctor, rebuilt as a **self-improving agent on [TrueForge](https://trueforge.dev)** for the Stranger Builds TrueForge challenge. It checks one Agentverse listing snapshot, reports which Agent Doctor rubric rules fail, and rewrites the listing text (description, README, keywords, starter prompts). It scores itself on a fixed task set, rewrites its own skills and instructions from its failures, and runs again.
+
+How it uses TrueForge:
+
+- **Subagents:** for every listing, the root agent calls `create_sub_agent` twice: a `diagnose` subagent (which rules fail) and a `rewrite` subagent (new listing text). The root merges both into one JSON reply.
+- **Git skills:** two TrueForge skills live in this repo, `agent/skills/profile-rubric` (the rubric) and `agent/skills/listing-rewrite` (how to write the listing). They are registered in `git` mode, pinned to the commit that runs, and read from the sandbox.
+- **Sandbox:** skills need it; the agent also saves its rewrite there (`fixed/README.md`, `fixed/listing.json`).
+- **SDK:** `scripts/*.ts` drive TrueForge through `@truefoundry/trueforge-sdk`: sync the agent, one session per eval run, export every session to `runs/`.
+
+The eval: 6 synthetic listings in `evals/tasks/` (4 training, 2 holdout that `improve` never sees). Each task's expected findings are generated from Agent Doctor's own scorer (`agent/scorer.py`), never hand-written. `evals/score.ts` is deterministic: half diagnosis (rules caught, minus a penalty for rules that did not fail), half rewrite (README sections and length, description length, keywords that appear in the text, the owner's terms kept, starter prompts).
+
+The skills **start short on purpose**: the agent grows them from the scorer's feedback. That is the point of the challenge.
+
+## Run 1 vs run N
+
+- **Task and score:** _TBD after counted runs_
+- **Run 1 → run N:** _TBD after counted runs_
+- **The change that did it:** _TBD after counted runs_
+- **What the agent learned:** _TBD after counted runs_
+- **What still fails:** _TBD after counted runs_
+
+## How to run
+
+You need Node.js 22.18+, git, and a model on TrueForge. We use ASI:One (`asi1`) as an OpenAI-compatible custom provider.
+
+1. Start TrueForge in its own terminal and keep it running: `npx @truefoundry/trueforge@<version>` (we pin server version 0.184.2; opens http://localhost:8790). Add your model under **Settings → Models**; the key stays in TrueForge, never in this repo.
+2. Install and configure: `npm install`, then `cp .env.example .env` and set `TF_MODEL` (ours: `asi1/asi-1`) and `SKILL_REPO_URL` (this repo's public URL). TrueForge needs no secrets in `.env`: the Agent Doctor keys in `.env.example` can stay blank, and the model key lives only in TrueForge.
+3. Create the agent: `npm run setup`.
+4. Run the evals: `npm run run-evals` (one TrueForge session; saves `runs/run-NN/` and a row in `runs/summary.csv`). Skills are cloned at the commit that runs, so push first.
+5. Let the agent improve itself: `npm run improve` (it rewrites `agent/` from its failed training tasks and commits with `Agent-Session: <id>`), review with `git show`, push, then `npm run run-evals` again.
+
+Checks that need no model: `npm run score -- --selftest`, `npm run typecheck`.
+
+## Credits
+
+- TrueForge scripts, eval loop and repo layout are adapted from the TrueForge starter (`nerdconf/trueforge-starter` on GitHub, MIT). Its license is in `LICENSES/trueforge-starter-MIT.txt`.
+- What existed before the TrueForge work: the Agent Doctor uAgent (the Python code in `agent/*.py`, `tests/`, `deploy/`), built since 2026-11-03 for the Fetch.ai track.
+- New for TrueForge: `agent/agent.json`, `agent/instructions.md`, `agent/skills/`, `evals/`, `scripts/*.ts`, `runs/`.
