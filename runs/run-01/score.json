@@ -1,0 +1,11 @@
+{
+  "run": 1,
+  "session_id": "01m6x9rf4qzxejsyc0hafc6663",
+  "agent_commit": "d7c4ab6c798c213907090e674f560a5dfaf6df81",
+  "score": 51.44,
+  "tasks_passed": 0,
+  "tasks_total": 6,
+  "tokens": 177800,
+  "toolCalls": 33,
+  "duration_s": 170
+}
