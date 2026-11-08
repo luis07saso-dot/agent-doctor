@@ -1,0 +1,332 @@
+[
+  {
+    "task_id": "01-blank-template",
+    "holdout": false,
+    "score": 1,
+    "passed": true,
+    "parsed": true,
+    "diagnosis": 1,
+    "rewrite": 1,
+    "caught": [
+      "readme_sections",
+      "readme",
+      "description",
+      "rating",
+      "avatar",
+      "starter_prompts"
+    ],
+    "missed": [],
+    "noise": [],
+    "checks": [
+      {
+        "name": "readme_sections",
+        "score": 1,
+        "detail": "6/6 sections"
+      },
+      {
+        "name": "readme_length",
+        "score": 1,
+        "detail": "README 2210 chars (min 300)"
+      },
+      {
+        "name": "description",
+        "score": 1,
+        "detail": "description 94 chars (min 40)"
+      },
+      {
+        "name": "keywords",
+        "score": 1,
+        "detail": "all keywords appear"
+      },
+      {
+        "name": "owner_terms",
+        "score": 1,
+        "detail": "README keeps the owner's terms"
+      },
+      {
+        "name": "starter_prompts",
+        "score": 1,
+        "detail": "4 starter prompts"
+      }
+    ],
+    "turn_id": "01m6xcmtrqnxevaadnbaswqsmh",
+    "status": "done",
+    "reply": "All checks pass: the README has all 6 sections in order, ~1,965 characters of prose outside headings, all 6 keywords appear word-for-word, 4 question-form starter prompts, and no triple backticks. Files saved as `fixed/README.md` and `fixed/listing.json`.\n\n```json\n{\n  \"findings\": [\n    { \"rule\": \"readme_sections\", \"fix\": \"The README is empty, so add Summary, Key features, Usage, Use cases, Limitations and Metadata as ## headings.\" },\n    { \"rule\": \"readme\", \"fix\": \"The README is empty; write at least 300 characters of plain prose covering the metric-to-cup conversion capability.\" },\n    { \"rule\": \"description\", \"fix\": \"The description is empty; add a one-line description saying the agent converts recipe ingredient lists between metric and US cup measures.\" },\n    { \"rule\": \"rating\", \"fix\": \"Rating is 0.8, below 5; earn more successful verified interactions to raise it toward 5 (console metrics action).\" },\n    { \"rule\": \"avatar\", \"fix\": \"Avatar is false; upload an avatar image in the Agentverse console.\" },\n    { \"rule\": \"starter_prompts\", \"fix\": \"Starter prompts are empty; add 2-4 question-form starter prompts in the console.\" }\n  ],\n  \"rewrite\": {\n    \"description\": \"Converts recipe ingredient lists between metric and US cup measures for home cooks and bakers.\",\n    \"readme\": \"## Summary\\nThis agent converts recipe ingredient lists between metric and US cup measures. Paste any ingredient list and it returns the same list with every quantity restated in the unit system you asked for. It is built for home cooks and bakers who follow recipes written for the other measurement system.\\n\\n## Key features\\n- Converts complete ingredient lists line by line, not just single values.\\n- Handles metric units such as grams, kilograms, and millilitres.\\n- Handles US units such as cups, tablespoons, and teaspoons, including common fractions.\\n- Choose the direction you need: from metric to cups, or from US cups to metric weights.\\n- Keeps ingredient names and their order intact so the converted list is ready to use.\\n\\n## Usage\\nPaste your ingredient list and say which system you want, for example metric weights or cup volumes. The agent replies with the same list in the requested units. An example exchange:\\n\\n    You: Convert this list to cups: 250 g flour, 300 ml milk, 150 g sugar.\\n    Agent: 2 cups flour, 1 1/4 cups milk, 3/4 cup sugar (approximate volume measures).\\n\\nYou can also ask it to convert cups to grams when you prefer weighing ingredients on a kitchen scale, or grams to cups when a recipe is written by weight but your kitchen measures by volume.\\n\\n## Use cases\\nHome cooks adapting a European recipe for US measuring cups, and American bakers following a recipe written in grams. Bakers who want consistent baking measurements for reliable results. Food bloggers and cookbook writers localising recipes for readers in another region. Anyone cooking from a mix of sources with different units.\\n\\n## Limitations\\nWeight-to-volume conversion depends on ingredient density, so cup results are approximations based on standard average densities for common ingredients. Unusual ingredients may be estimated loosely or flagged for you to double-check. The agent converts units in ingredient lists; it does not scale recipe quantities, suggest substitutions, generate recipes, or read tables, images, or PDF attachments.\\n\\n## Metadata\\nVersion: 1.0.0. Category: Cooking and food. Data source: none; the agent uses standard unit definitions and widely published ingredient density references.\",\n    \"keywords\": [\"recipe ingredient lists\", \"metric to cups\", \"convert cups to grams\", \"grams to cups\", \"US cup measures\", \"baking measurements\"],\n    \"starter_prompts\": [\n      \"Can you convert this ingredient list to cups: 250 g flour, 300 ml milk, and 150 g sugar?\",\n      \"How many grams of flour is 2 cups?\",\n      \"Can you rewrite 1 1/2 cups of butter and 1 cup of milk in metric weights?\",\n      \"What is 200 ml of cream in cups?\"\n    ]\n  }\n}\n```"
+  },
+  {
+    "task_id": "02-offline-no-chat",
+    "holdout": false,
+    "score": 1,
+    "passed": true,
+    "parsed": true,
+    "diagnosis": 1,
+    "rewrite": 1,
+    "caught": [
+      "active",
+      "chat_protocol",
+      "responsive",
+      "readme_sections",
+      "readme",
+      "description",
+      "interactions",
+      "starter_prompts"
+    ],
+    "missed": [],
+    "noise": [],
+    "checks": [
+      {
+        "name": "readme_sections",
+        "score": 1,
+        "detail": "6/6 sections"
+      },
+      {
+        "name": "readme_length",
+        "score": 1,
+        "detail": "README 2263 chars (min 300)"
+      },
+      {
+        "name": "description",
+        "score": 1,
+        "detail": "description 92 chars (min 40)"
+      },
+      {
+        "name": "keywords",
+        "score": 1,
+        "detail": "all keywords appear"
+      },
+      {
+        "name": "owner_terms",
+        "score": 1,
+        "detail": "README keeps the owner's terms"
+      },
+      {
+        "name": "starter_prompts",
+        "score": 1,
+        "detail": "4 starter prompts"
+      }
+    ],
+    "turn_id": "01m6xcph46593weqt2k1ma8tah",
+    "status": "done",
+    "reply": "Both sub-agents completed: 8 rubric rules fail, and the rewrite passed every sanity check (6 sections in order, all keywords present word-for-word, 1136 chars of prose, 4 question-form prompts, no triple backticks). Fixed files:\n\n```sandbox_artifacts\n[Fixed README](~/agent-doctor/fixed/README.md)\n[Full rewrite JSON](~/agent-doctor/fixed/listing.json)\n```\n\n```json\n{\n  \"findings\": [\n    { \"rule\": \"active\", \"fix\": \"Snapshot field status is inactive — activate TideBot from the Agentverse console.\" },\n    { \"rule\": \"chat_protocol\", \"fix\": \"Snapshot field chat_protocol is false — enable the chat protocol so users can chat with the agent.\" },\n    { \"rule\": \"responsive\", \"fix\": \"Snapshot field status is inactive, so the agent is not responding — bring it back online.\" },\n    { \"rule\": \"readme_sections\", \"fix\": \"Snapshot field readme has only a Usage heading — add Summary, Key features, Use cases, Limitations and Metadata sections.\" },\n    { \"rule\": \"readme\", \"fix\": \"Snapshot field readme has only ~47 characters of text outside headings — expand it into full sections.\" },\n    { \"rule\": \"description\", \"fix\": \"Snapshot field description is only 15 characters — replace with a 60-120 character line saying what it does and for whom.\" },\n    { \"rule\": \"interactions\", \"fix\": \"Snapshot field total_interactions is 3, below 10 — gather more verified interactions.\" },\n    { \"rule\": \"starter_prompts\", \"fix\": \"Snapshot field starter_prompts is an empty list — add 2-4 example questions.\" }\n  ],\n  \"rewrite\": {\n    \"description\": \"Delivers high and low tide tables for Australian beaches, with forecasts up to 7 days ahead.\",\n    \"readme\": \"# TideBot\\n\\n## Summary\\nTideBot provides high and low tide tables for Australian beaches, with forecasts up to 7 days ahead. It is built for surfers, swimmers, fishers, and anyone planning a day on the Australian coast. Name a beach and a day, and TideBot replies with the tide times for that spot.\\n\\n## Key features\\n- Covers high and low tides for named Australian beaches, with times and heights for every event.\\n- A tide forecast up to 7 days ahead, so a weekend trip can be planned mid-week.\\n- Plain-language queries: give a beach and a date, and the table comes back in one reply.\\n- Nationwide coverage of the Australian coastline, from city beaches to remote surf spots.\\n\\n## Usage\\nSend TideBot a message naming an Australian beach and the day you care about: today, tomorrow, a weekday, or the whole coming week. It replies with a tide table listing each high and low event, in order, for that location and period. Times and heights in the example below are illustrative.\\n\\n    User: What are the tides at Bondi Beach tomorrow?\\n    TideBot: High tides: 3:42 am (1.6 m), 4:05 pm (1.7 m). Low tides: 9:58 am (0.3 m), 10:21 pm (0.4 m).\\n\\n## Use cases\\nSurfers picking a session window, fishers timing a trip around the tide turn, swimmers and snorkellers avoiding strong currents near tide changes, and boaties or kayakers planning a launch. Photographers chasing low-tide rock pools and families waiting for a sandbar to appear also benefit. Anyone who needs to know when the water will be high or low at an Australian beach within the next week can use TideBot.\\n\\n## Limitations\\n- Only Australian beaches are covered; locations outside Australia are not supported.\\n- The forecast window is capped at 7 days ahead, and past or historical tides are not available.\\n- Predictions are astronomical approximations: wind, weather, and storm surge can shift real water levels, so do not rely on TideBot for navigation or safety-critical decisions.\\n- Very small or informally named spots may not resolve; use a well-known beach or a nearby town name for better results.\\n\\n## Metadata\\n- Version: 1.0.0\\n- Category: Weather and outdoors\\n- Source of data: publicly available tide prediction tables for Australian coastal stations; TideBot returns predicted, not observed, levels.\\n\",\n    \"keywords\": [\"tide tables\", \"Australian beaches\", \"high and low tides\", \"tide times\", \"tide forecast\", \"7 days ahead\"],\n    \"starter_prompts\": [\n      \"What are the high and low tides at Bondi Beach tomorrow?\",\n      \"Can you show me the tide tables for Byron Bay this weekend?\",\n      \"When is high tide at Surfers Paradise on Saturday?\",\n      \"What is the tide forecast for St Kilda for the next 7 days?\"\n    ]\n  }\n}\n```"
+  },
+  {
+    "task_id": "03-flagged-busy",
+    "holdout": false,
+    "score": 0.95,
+    "passed": false,
+    "parsed": true,
+    "diagnosis": 0.9,
+    "rewrite": 1,
+    "caught": [
+      "responsive",
+      "readme_sections",
+      "rating",
+      "success_rate",
+      "handle"
+    ],
+    "missed": [],
+    "noise": [
+      "readme"
+    ],
+    "checks": [
+      {
+        "name": "readme_sections",
+        "score": 1,
+        "detail": "6/6 sections"
+      },
+      {
+        "name": "readme_length",
+        "score": 1,
+        "detail": "README 2139 chars (min 300)"
+      },
+      {
+        "name": "description",
+        "score": 1,
+        "detail": "description 79 chars (min 40)"
+      },
+      {
+        "name": "keywords",
+        "score": 1,
+        "detail": "all keywords appear"
+      },
+      {
+        "name": "owner_terms",
+        "score": 1,
+        "detail": "README keeps the owner's terms"
+      },
+      {
+        "name": "starter_prompts",
+        "score": 1,
+        "detail": "3 starter prompts"
+      }
+    ],
+    "turn_id": "01m6xcrpegx0gbgm8vgjk5f00d",
+    "status": "done",
+    "reply": "Both sub-agents have reported; the rewrite passed all sanity checks (6 exact headings, all 6 keywords found word-for-word, 2044 chars of prose, 3 question-form prompts, no triple backticks), and the files are saved. Six rubric rules fail: responsive, readme_sections, readme, rating, success_rate, handle.\n\n```sandbox_artifacts\n[Fixed README](~/Library/Application Support/trueforge/sandboxes/01m6xcmtrgvganf14qx8vajz2k/01m6xcrr8ymttnfa1db4v5se0y/fixed/README.md)\n[Fixed listing JSON](~/Library/Application Support/trueforge/sandboxes/01m6xcmtrgvganf14qx8vajz2k/01m6xcrr8ymttnfa1db4v5se0y/fixed/listing.json)\n```\n\n```json\n{\n  \"findings\": [\n    { \"rule\": \"responsive\", \"fix\": \"unresponsive is true — keep the agent running and responding reliably so it stops being flagged unresponsive.\" },\n    { \"rule\": \"readme_sections\", \"fix\": \"README has only Features, Usage and Limitations — add the missing Summary, Key features, Use cases and Metadata sections as ## headings.\" },\n    { \"rule\": \"readme\", \"fix\": \"README has only ~275 characters of plain text outside headings — expand the body past the ~300 minimum.\" },\n    { \"rule\": \"rating\", \"fix\": \"rating is 3.9, below 5 — improve extraction quality until the rating reaches 5.\" },\n    { \"rule\": \"success_rate\", \"fix\": \"recent_success_rate is 0.62 — fix the parsing failures so all recent interactions succeed.\" },\n    { \"rule\": \"handle\", \"fix\": \"handle is empty — set a handle for the agent in the Agentverse console.\" }\n  ],\n  \"rewrite\": {\n    \"description\": \"Extracts supplier, total and due date from pasted invoice text for small teams.\",\n    \"readme\": \"# Invoice Helper\\n\\n## Summary\\n\\nInvoice Helper extracts the supplier, the total amount and the due date from invoice text you paste into the chat, and returns the three details as a short table. It is built for small teams that receive supplier invoices by email and want the key fields pulled out quickly instead of retyping them by hand.\\n\\n## Key features\\n\\n- Pulls the supplier name, total amount and due date out of pasted invoice text\\n- Returns the three fields as a short table that is easy to copy into your records\\n- Recognises totals in AUD, USD and EUR\\n- Works on plain text you paste directly into the chat, with no file uploads needed\\n- Built for small teams that log supplier invoices each week\\n\\n## Usage\\n\\nPaste the invoice text into the chat and ask for the supplier, total and due date. Invoice Helper replies with a short table of the three fields plus the currency, ready to copy into your accounts payable log.\\n\\n    User: Here is our power bill, please pull out the supplier, total and due date.\\n    Invoice Helper: Supplier: City Power Ltd. Total: 184.50 AUD. Due date: 14 March 2025.\\n\\nCopy the reply straight into your spreadsheet or bookkeeping tool once you have checked the figures.\\n\\n## Use cases\\n\\nSmall teams, sole traders and office administrators who receive supplier invoices by email can paste the text here instead of retyping the same details by hand. It helps at the end of the week when several bills arrive at once and someone needs to log them quickly, and it suits anyone building an accounts payable log or feeding details into a spreadsheet.\\n\\n## Limitations\\n\\nInvoice Helper works on pasted text only; it cannot read scanned images or PDF files, so copy the invoice text out first. Totals are recognised in AUD, USD and EUR; other currencies, invoices with several totals or partial payments, and heavily formatted or garbled text may be extracted incorrectly or missed. Check every extracted figure before you pay, as the agent only reads what you paste.\\n\\n## Metadata\\n\\n- Version: 1.0\\n- Category: Finance and accounting\\n- Source of data: none; every detail comes from the invoice text you paste in the chat.\\n\",\n    \"keywords\": [\"invoice text\", \"due date\", \"total amount\", \"supplier invoices\", \"small teams\", \"accounts payable\"],\n    \"starter_prompts\": [\n      \"Can you extract the supplier, total and due date from this invoice text?\",\n      \"What is the total amount and due date on this invoice?\",\n      \"Which supplier issued this invoice, and in which currency is the total?\"\n    ]\n  }\n}\n```"
+  },
+  {
+    "task_id": "04-nearly-strong",
+    "holdout": false,
+    "score": 1,
+    "passed": true,
+    "parsed": true,
+    "diagnosis": 1,
+    "rewrite": 1,
+    "caught": [
+      "rating",
+      "success_rate",
+      "eval_rate",
+      "starter_prompts"
+    ],
+    "missed": [],
+    "noise": [],
+    "checks": [
+      {
+        "name": "readme_sections",
+        "score": 1,
+        "detail": "6/6 sections"
+      },
+      {
+        "name": "readme_length",
+        "score": 1,
+        "detail": "README 2050 chars (min 300)"
+      },
+      {
+        "name": "description",
+        "score": 1,
+        "detail": "description 87 chars (min 40)"
+      },
+      {
+        "name": "keywords",
+        "score": 1,
+        "detail": "all keywords appear"
+      },
+      {
+        "name": "owner_terms",
+        "score": 1,
+        "detail": "README keeps the owner's terms"
+      },
+      {
+        "name": "starter_prompts",
+        "score": 1,
+        "detail": "4 starter prompts"
+      }
+    ],
+    "turn_id": "01m6xctx85vm8mfwc427d6eqtw",
+    "status": "done",
+    "reply": "All checks pass — 6 sections in order, all keywords word-for-word, 1,917 chars of prose, 4 question prompts, no triple backticks. Fixed files saved below; findings and rewrite follow.\n\n```sandbox_artifacts\n[Fixed README](~/Library/Application Support/trueforge/sandboxes/01m6xcmtrgvganf14qx8vajz2k/01m6xctz2q7c5symmjn9s9efjj/fixed/README.md)\n[Fixed listing](~/Library/Application Support/trueforge/sandboxes/01m6xcmtrgvganf14qx8vajz2k/01m6xctz2q7c5symmjn9s9efjj/fixed/listing.json)\n```\n\n```json\n{\n  \"findings\": [\n    { \"rule\": \"rating\", \"fix\": \"rating is 4.6, below 5; keep improving answer quality until users award 5 stars.\" },\n    { \"rule\": \"success_rate\", \"fix\": \"recent_success_rate is 0.95, below 1.0; cut failed interactions to return to 1.0.\" },\n    { \"rule\": \"eval_rate\", \"fix\": \"recent_eval_success_rate is 0.9, below 1.0; fix whatever automated evals flag to reach 1.0.\" },\n    { \"rule\": \"starter_prompts\", \"fix\": \"starter_prompts is empty; add 2-4 question-form prompts, provided in the rewrite.\" }\n  ],\n  \"rewrite\": {\n    \"description\": \"Live flight status and delay risk for any flight number and date, built for travellers.\",\n    \"readme\": \"# Flight Delay Checker\\n\\n## Summary\\n\\nFlight Delay Checker tells travellers whether a commercial flight is on time, delayed or cancelled, using just a flight number and date. It combines a live flight status feed with a delay risk score, so you can see not only what is happening now but how likely a delay is. It is built for people who fly and for the assistants that book and manage travel on their behalf.\\n\\n## Key features\\n\\n- Live flight status for any commercial flight number and date\\n- Delay risk score showing how likely a delay is\\n- Plain-English answers instead of raw aviation feeds\\n- Covers on-time, delayed, cancelled and other common statuses\\n- Fast checks you can run before leaving for the airport\\n\\n## Usage\\n\\nSend the agent a flight number and the date of travel, and it replies with the current flight status and a delay risk in one short answer. A typical exchange looks like this:\\n\\n    User: What is the status of QF1 on 12 Nov?\\n    Agent: QF1 on 12 Nov is on time. Delay risk is low - no disruptions expected right now.\\n\\nInclude the date every time, because the same flight number can mean different flights on different days.\\n\\n## Use cases\\n\\nTravellers asking \\\"is my flight delayed\\\" before heading to the airport, friends and family planning airport pickups, and assistants or booking tools that want a quick status and delay check while arranging a trip. It is just as useful the night before a flight as on the morning of departure.\\n\\n## Limitations\\n\\nCommercial passenger flights only - private, charter and cargo flights are not covered. Statuses are only as fresh as the live feed, so very recent gate, crew or schedule changes may lag reality by a few minutes. The delay risk score is an estimate based on past patterns, not a guarantee, and it cannot foresee events such as sudden weather that have not yet reached the data. Always give both the flight number and the date, since either on its own is ambiguous.\\n\\n## Metadata\\n\\nVersion 1.2. Category: travel. Data source: live flight status feed for commercial passenger flights.\\n\",\n    \"keywords\": [\"live flight status\", \"flight status\", \"delay risk\", \"flight number and date\", \"is my flight delayed\", \"delayed or cancelled\"],\n    \"starter_prompts\": [\"What is the status of QF1 on 12 Nov?\", \"Is QF1 on 12 Nov on time or delayed?\", \"What is the delay risk for QF1 on 12 Nov?\", \"Will QF1 on 12 Nov arrive on time?\"]\n  }\n}\n```"
+  },
+  {
+    "task_id": "05-wall-of-text",
+    "holdout": true,
+    "score": 0.95,
+    "passed": false,
+    "parsed": true,
+    "diagnosis": 0.9,
+    "rewrite": 1,
+    "caught": [
+      "readme_sections",
+      "rating",
+      "eval_rate",
+      "interactions",
+      "avatar"
+    ],
+    "missed": [],
+    "noise": [
+      "starter_prompts"
+    ],
+    "checks": [
+      {
+        "name": "readme_sections",
+        "score": 1,
+        "detail": "6/6 sections"
+      },
+      {
+        "name": "readme_length",
+        "score": 1,
+        "detail": "README 2379 chars (min 300)"
+      },
+      {
+        "name": "description",
+        "score": 1,
+        "detail": "description 115 chars (min 40)"
+      },
+      {
+        "name": "keywords",
+        "score": 1,
+        "detail": "all keywords appear"
+      },
+      {
+        "name": "owner_terms",
+        "score": 1,
+        "detail": "README keeps the owner's terms"
+      },
+      {
+        "name": "starter_prompts",
+        "score": 1,
+        "detail": "4 starter prompts"
+      }
+    ],
+    "turn_id": "01m6xcwtpqe9148tb91f7x1eaf",
+    "status": "done",
+    "reply": "Both jobs are done: the diagnosis found six failing rules, and the rewrite passed every check (6 exact headings, all 6 keywords word-for-word, ~2,283 chars of prose, 4 question prompts, no triple backticks). The fixed files are saved at `/sandbox/fixed/README.md` and `/sandbox/fixed/listing.json`.\n\n```json\n{\n  \"findings\": [\n    { \"rule\": \"readme_sections\", \"fix\": \"The readme field is one paragraph with no ## headings — add the six required sections: Summary, Key features, Usage, Use cases, Limitations, Metadata.\" },\n    { \"rule\": \"rating\", \"fix\": \"Rating is 4.2 (below 5) — earn better reviews by improving answer reliability; this is a console metric, not editable text.\" },\n    { \"rule\": \"eval_rate\", \"fix\": \"recent_eval_success_rate is 0.7 (below 1.0) — fix the causes of failed evaluations.\" },\n    { \"rule\": \"interactions\", \"fix\": \"total_interactions is 8 (below 10) — get more users to try the agent.\" },\n    { \"rule\": \"avatar\", \"fix\": \"avatar is false — upload an avatar image in the Agentverse console.\" },\n    { \"rule\": \"starter_prompts\", \"fix\": \"starter_prompts has only 1 entry — add at least one more question.\" }\n  ],\n  \"rewrite\": {\n    \"description\": \"Summarises visa-free days, e-visa and transit rules by passport and destination, for backpackers and travel agents.\",\n    \"readme\": \"## Summary\\n\\nVisa Rules Guide gives travellers a quick first answer on entry requirements. Tell it your passport country and where you are going and it summarises visa-free days, e-visa options and transit rules in one short reply. It is built for backpackers, holidaymakers and travel agents who need the essentials before checking the embassy page.\\n\\n## Key features\\n\\n- Summarises visa-free days for your passport and destination.\\n- Explains e-visa options and where you can apply online.\\n- Covers transit rules for layovers and connecting flights.\\n- One short exchange: name your passport country and destination and get a summary.\\n- Flags when you should confirm details on the embassy page before you travel.\\n\\n## Usage\\n\\nSend one message with your passport country and your destination. The agent replies with a summary of visa-free days, e-visa options and transit rules for that route, plus a reminder to confirm on official pages. Example exchange:\\n\\n    You: Do I need a visa for Japan with an Indian passport?\\n    Agent: Here is the summary for an Indian passport travelling to Japan: visa-free days that apply on this route, e-visa options where available, and transit rules for any country you connect through. Rules change often, so confirm on the embassy page before you travel.\\n\\n## Use cases\\n\\nBackpackers planning multi-country trips can check each leg quickly before booking. Holidaymakers can see whether they can enter visa-free, need an e-visa or should book an embassy appointment. Travel agents can use it for a fast first read on a client's route, especially transit rules for tight layovers. It is most useful early in planning, as a starting point before you verify with official sources.\\n\\n## Limitations\\n\\nThe agent summarises rules; it does not file applications and cannot guarantee entry. Visa policies change often, so always check the embassy page before you travel. It works from the official sources it was given, so very recent changes may not be reflected. It answers for one passport and destination pair at a time and does not assess personal circumstances such as residence permits, dual nationality or prior refusals. The final decision always rests with border authorities.\\n\\n## Metadata\\n\\nVersion 1.1. Category: Travel. Source of data: official visa and immigration sources given to the agent. Handle: visarules. Chat protocol: ask in plain text.\",\n    \"keywords\": [\"visa-free days\", \"e-visa options\", \"transit rules\", \"entry requirements\", \"passport and destination\", \"embassy page\"],\n    \"starter_prompts\": [\n      \"Do I need a visa for Japan with an Indian passport?\",\n      \"How many visa-free days do I get in Thailand on a UK passport?\",\n      \"Can I get an e-visa for Vietnam with an Australian passport?\",\n      \"Do I need a transit visa for a layover in Doha with a Nigerian passport?\"\n    ]\n  }\n}\n```"
+  },
+  {
+    "task_id": "06-offline-unnamed",
+    "holdout": true,
+    "score": 0.9688,
+    "passed": false,
+    "parsed": true,
+    "diagnosis": 0.9375,
+    "rewrite": 1,
+    "caught": [
+      "active",
+      "responsive",
+      "readme_sections",
+      "description",
+      "rating",
+      "success_rate",
+      "handle",
+      "starter_prompts"
+    ],
+    "missed": [],
+    "noise": [
+      "readme"
+    ],
+    "checks": [
+      {
+        "name": "readme_sections",
+        "score": 1,
+        "detail": "6/6 sections"
+      },
+      {
+        "name": "readme_length",
+        "score": 1,
+        "detail": "README 3088 chars (min 300)"
+      },
+      {
+        "name": "description",
+        "score": 1,
+        "detail": "description 113 chars (min 40)"
+      },
+      {
+        "name": "keywords",
+        "score": 1,
+        "detail": "all keywords appear"
+      },
+      {
+        "name": "owner_terms",
+        "score": 1,
+        "detail": "README keeps the owner's terms"
+      },
+      {
+        "name": "starter_prompts",
+        "score": 1,
+        "detail": "4 starter prompts"
+      }
+    ],
+    "turn_id": "01m6xcykn84yzsfzhhsny4re22",
+    "status": "done",
+    "reply": "Fixed files saved below; here is the diagnosis and the validated rewrite.\n\n```sandbox_artifacts\n[Fixed README](~/sandbox/fixed/README.md)\n[Fixed listing JSON](~/sandbox/fixed/listing.json)\n```\n\n```json\n{\n  \"findings\": [\n    { \"rule\": \"active\", \"fix\": \"Activate the agent in the console so status becomes active.\" },\n    { \"rule\": \"responsive\", \"fix\": \"Bring the agent back online — status is inactive, so it is not responsive.\" },\n    { \"rule\": \"readme_sections\", \"fix\": \"Rebuild the README with the six required ## sections: Summary, Key features, Usage, Use cases, Limitations, Metadata.\" },\n    { \"rule\": \"readme\", \"fix\": \"Expand the body — only about 220 characters of plain prose sit outside the headings.\" },\n    { \"rule\": \"description\", \"fix\": \"Add a one-line description of what the agent does and for whom.\" },\n    { \"rule\": \"rating\", \"fix\": \"Lift the 2.5 rating toward 5 by improving answer quality; console-tracked.\" },\n    { \"rule\": \"success_rate\", \"fix\": \"Fix the recent failures so recent_success_rate rises from 0.4 back to 1.0.\" },\n    { \"rule\": \"handle\", \"fix\": \"Set a handle for the agent in the console.\" },\n    { \"rule\": \"starter_prompts\", \"fix\": \"Add 2-4 question-form starter prompts; the rewritten list below works as-is.\" }\n  ],\n  \"rewrite\": {\n    \"description\": \"Helps New Zealand small-business owners and founders find open grants by industry and region, with closing dates.\",\n    \"readme\": \"# Grant Finder\\n\\n## Summary\\n\\nGrant Finder finds open small-business grants across New Zealand and matches them to what your business does and where it operates. You tell it your industry and region, and it returns the grants that are still accepting applications together with their closing dates. It searches New Zealand grants run by central government, councils, and private funders, so owners, sole traders, and startups can skip scattered websites and go straight to schemes they can still apply for.\\n\\n## Key features\\n\\n- Industry and region filters: narrow grants by industry and region so results fit your business type and location.\\n- Open-grant focus: only lists grants that are currently open for applications, skipping closed or fully subscribed schemes.\\n- Closing dates on every result: see how long you have before each application closes.\\n- Coverage across funders: central government, regional council, and private programmes gathered into one shortlist.\\n- Quick follow-ups: ask which grant closes soonest, or which suits a startup rather than an established business.\\n\\n## Usage\\n\\nSend one message naming your industry and your region, for example hospitality in Wellington or construction in Canterbury. Grant Finder replies with a shortlist of open grants, each with a closing date, and you can refine from there by narrowing the region, adding details about your business, or asking which deadline is nearest. The exchange below shows a typical first message.\\n\\n    User: I run a cafe in Wellington. Are there any open grants for me?\\n    Grant Finder: I found 3 open grants for hospitality businesses in the Wellington region. The soonest closing date is in about six weeks; ask me for the details of any of them.\\n\\n## Use cases\\n\\nSole traders and startups checking whether funding exists before they buy equipment, hire staff, or open a second location. Established small businesses looking for regional development or innovation money without paying a consultant. Accountants, business advisors, and economic development officers who need a fast way to point clients toward schemes that are still open. Handy any time a deadline matters and you would rather not read dozens of funder pages yourself.\\n\\n## Limitations\\n\\nNew Zealand only: it does not cover Australian or other overseas schemes, and it focuses on small-business funding, so personal grants and study scholarships are out of scope. Closing dates change as programmes fill up or are extended, so treat every date as indicative and confirm it on the funder's own page before you apply. Results depend on how you describe your industry and region; a very niche industry or a thinly covered region may return few or no matches, and the shortlist is a starting point rather than a guaranteed complete list. There is no form or file upload, so plain-language messages work best.\\n\\n## Metadata\\n\\n- Version: 1.0\\n- Category: Business and finance\\n- Data source: publicly listed New Zealand grant programmes from central government, councils, and private funders; always verify current details with the funder before applying.\",\n    \"keywords\": [\n      \"small-business grants\",\n      \"New Zealand grants\",\n      \"closing dates\",\n      \"grants by industry\",\n      \"open grants\",\n      \"industry and region\"\n    ],\n    \"starter_prompts\": [\n      \"Are there any open small-business grants for a cafe in Wellington?\",\n      \"Which small-business grants are open for construction companies in Canterbury?\",\n      \"When is the closing date for grants open to retail businesses in Auckland?\",\n      \"Are there New Zealand grants open for a tech startup in Otago?\"\n    ]\n  }\n}\n```"
+  }
+]
