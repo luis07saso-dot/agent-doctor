@@ -1,0 +1,61 @@
+{
+  "id": "02-offline-no-chat",
+  "title": "Offline, no chat protocol, thin README",
+  "holdout": false,
+  "profile": {
+    "name": "TideBot",
+    "handle": "tidebot",
+    "description": "Tide times bot.",
+    "readme": "# TideBot\n\nGives tide tables.\n\n## Usage\n\nAsk: tides for Bondi tomorrow",
+    "avatar": true,
+    "chat_protocol": false,
+    "status": "inactive",
+    "unresponsive": false,
+    "rating": null,
+    "total_interactions": 3,
+    "recent_success_rate": null,
+    "recent_verified_interactions": 0,
+    "recent_eval_success_rate": null,
+    "domain": null,
+    "starter_prompts": []
+  },
+  "job": "Gives high and low tide tables for Australian beaches, up to 7 days ahead.",
+  "must_keep": [
+    "tide tables",
+    "Australian beaches"
+  ],
+  "expected": [
+    {
+      "rule": "active",
+      "why": "offline: Bring the agent online and keep it running (only active agents are ranked; inactive ones are pushed down)"
+    },
+    {
+      "rule": "chat_protocol",
+      "why": "missing: Add the Agent Chat Protocol (agent.include(chat_proto, publish_manifest=True))"
+    },
+    {
+      "rule": "readme_sections",
+      "why": "1/6 sections: Add README sections: Summary, Key features, Use cases, Limitations, Metadata"
+    },
+    {
+      "rule": "readme",
+      "why": "70 chars: Expand the README to at least 300 characters of plain description"
+    },
+    {
+      "rule": "description",
+      "why": "15 chars: Make the description say what the agent does and for whom"
+    },
+    {
+      "rule": "responsive",
+      "why": "offline: Answer every message (offline agents time out)"
+    },
+    {
+      "rule": "interactions",
+      "why": "3: Reach 10+ interactions (run Testing; share with real users)"
+    },
+    {
+      "rule": "starter_prompts",
+      "why": "0: Add 2-4 starter prompts that match your README"
+    }
+  ]
+}

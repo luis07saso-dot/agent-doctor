@@ -1,0 +1,45 @@
+{
+  "id": "04-nearly-strong",
+  "title": "Strong listing with subtle gaps",
+  "holdout": false,
+  "profile": {
+    "name": "Flight Delay Checker",
+    "handle": "flightdelays",
+    "description": "Checks live flight status and delay risk for a flight number and date.",
+    "readme": "# Flight Delay Checker\n\n## Summary\n\nFlight Delay Checker tells travellers whether a flight is on time, delayed or cancelled, and how likely a delay is, from the flight number and date.\n\n## Key features\n\n- Live status\n- Delay risk score\n\n## Usage\n\nExample input: QF1 on 12 Nov. Example output: On time, delay risk low.\n\n## Use cases\n\nTravellers, assistants booking trips.\n\n## Limitations\n\nCommercial flights only.\n\n## Metadata\n\nVersion 1.2",
+    "avatar": true,
+    "chat_protocol": true,
+    "status": "active",
+    "unresponsive": false,
+    "rating": 4.6,
+    "total_interactions": 860,
+    "recent_success_rate": 0.95,
+    "recent_verified_interactions": 300,
+    "recent_eval_success_rate": 0.9,
+    "domain": "flightdelay.example",
+    "starter_prompts": []
+  },
+  "job": "Live flight status and delay risk from a flight number and date, for travellers.",
+  "must_keep": [
+    "flight number",
+    "delay risk"
+  ],
+  "expected": [
+    {
+      "rule": "rating",
+      "why": "4.6/5: Raise rating: pass Agentverse Testing runs and get real ASI:One users"
+    },
+    {
+      "rule": "success_rate",
+      "why": "95%: Get real users chatting via ASI:One; answer every in-scope question well"
+    },
+    {
+      "rule": "eval_rate",
+      "why": "90%: Run Agentverse Testing (Testing tab) with real in-scope questions"
+    },
+    {
+      "rule": "starter_prompts",
+      "why": "0: Add 2-4 starter prompts that match your README"
+    }
+  ]
+}

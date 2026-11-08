@@ -1,0 +1,61 @@
+{
+  "id": "06-offline-unnamed",
+  "title": "Offline, no handle, empty description (holdout)",
+  "holdout": true,
+  "profile": {
+    "name": "Grant Finder",
+    "handle": "",
+    "description": "",
+    "readme": "# Grant Finder\n\n## Overview\n\nFinds open small-business grants in New Zealand that match your industry and region, with closing dates.\n\n## Features\n\n- Industry and region filters\n- Closing dates\n\n## How to use\n\nTell it your industry and region.\n\n## Use cases\n\nSole traders, startups.\n\n## Limitations\n\nNew Zealand only.",
+    "avatar": true,
+    "chat_protocol": true,
+    "status": "inactive",
+    "unresponsive": false,
+    "rating": 2.5,
+    "total_interactions": 40,
+    "recent_success_rate": 0.4,
+    "recent_verified_interactions": 10,
+    "recent_eval_success_rate": null,
+    "domain": null,
+    "starter_prompts": []
+  },
+  "job": "Finds open New Zealand small-business grants by industry and region, with closing dates.",
+  "must_keep": [
+    "small-business grants",
+    "closing dates"
+  ],
+  "expected": [
+    {
+      "rule": "active",
+      "why": "offline: Bring the agent online and keep it running (only active agents are ranked; inactive ones are pushed down)"
+    },
+    {
+      "rule": "readme_sections",
+      "why": "5/6 sections: Add README sections: Metadata"
+    },
+    {
+      "rule": "rating",
+      "why": "2.5/5: Raise rating: pass Agentverse Testing runs and get real ASI:One users"
+    },
+    {
+      "rule": "description",
+      "why": "missing: Add a one-line Agent Description"
+    },
+    {
+      "rule": "responsive",
+      "why": "offline: Answer every message (offline agents time out)"
+    },
+    {
+      "rule": "handle",
+      "why": "none: Set a custom @handle (max 20 chars) close to the agent's job"
+    },
+    {
+      "rule": "success_rate",
+      "why": "40%: Get real users chatting via ASI:One; answer every in-scope question well"
+    },
+    {
+      "rule": "starter_prompts",
+      "why": "0: Add 2-4 starter prompts that match your README"
+    }
+  ]
+}

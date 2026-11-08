@@ -1,0 +1,51 @@
+{
+  "id": "05-wall-of-text",
+  "title": "README with no headings, low metrics (holdout)",
+  "holdout": true,
+  "profile": {
+    "name": "Visa Rules Guide",
+    "handle": "visarules",
+    "description": "Visa entry rules by passport and destination.",
+    "readme": "Visa Rules Guide answers questions about entry requirements. Tell it your passport country and where you are going and it summarises visa-free days, e-visa options and transit rules from official sources it was given. It does not file applications and rules change often, so always check the embassy page before you travel. Built for backpackers and travel agents who need a quick first answer.",
+    "avatar": false,
+    "chat_protocol": true,
+    "status": "active",
+    "unresponsive": false,
+    "rating": 4.2,
+    "total_interactions": 8,
+    "recent_success_rate": null,
+    "recent_verified_interactions": 0,
+    "recent_eval_success_rate": 0.7,
+    "domain": null,
+    "starter_prompts": [
+      "Do I need a visa for Japan with an Indian passport?"
+    ]
+  },
+  "job": "Summarises visa-free days, e-visa and transit rules by passport and destination.",
+  "must_keep": [
+    "passport and destination",
+    "transit rules"
+  ],
+  "expected": [
+    {
+      "rule": "readme_sections",
+      "why": "1/6 sections: Add README sections: Key features, Usage, Use cases, Limitations, Metadata"
+    },
+    {
+      "rule": "rating",
+      "why": "4.2/5: Raise rating: pass Agentverse Testing runs and get real ASI:One users"
+    },
+    {
+      "rule": "avatar",
+      "why": "missing: Upload an avatar"
+    },
+    {
+      "rule": "interactions",
+      "why": "8: Reach 10+ interactions (run Testing; share with real users)"
+    },
+    {
+      "rule": "eval_rate",
+      "why": "70%: Run Agentverse Testing (Testing tab) with real in-scope questions"
+    }
+  ]
+}

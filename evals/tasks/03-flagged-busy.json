@@ -1,0 +1,52 @@
+{
+  "id": "03-flagged-busy",
+  "title": "Busy agent, unresponsive flag, no handle",
+  "holdout": false,
+  "profile": {
+    "name": "Invoice Helper",
+    "handle": "",
+    "description": "Extracts totals, due dates and supplier names from invoice PDFs you paste as text.",
+    "readme": "# Invoice Helper\n\nInvoice Helper reads invoice text and returns the supplier, total amount and due date as a short table, so small teams can log bills fast.\n\n## Features\n\n- Supplier, total, due date, currency\n- Handles AUD, USD, EUR\n\n## Usage\n\nPaste the invoice text and ask for the totals.\n\n## Limitations\n\nText only; no scanned images.",
+    "avatar": true,
+    "chat_protocol": true,
+    "status": "active",
+    "unresponsive": true,
+    "rating": 3.9,
+    "total_interactions": 120,
+    "recent_success_rate": 0.62,
+    "recent_verified_interactions": 40,
+    "recent_eval_success_rate": null,
+    "domain": null,
+    "starter_prompts": [
+      "Extract the total from this invoice",
+      "When is this invoice due?"
+    ]
+  },
+  "job": "Extracts supplier, total and due date from pasted invoice text for small teams.",
+  "must_keep": [
+    "invoice text",
+    "due date"
+  ],
+  "expected": [
+    {
+      "rule": "readme_sections",
+      "why": "4/6 sections: Add README sections: Use cases, Metadata"
+    },
+    {
+      "rule": "rating",
+      "why": "3.9/5: Raise rating: pass Agentverse Testing runs and get real ASI:One users"
+    },
+    {
+      "rule": "responsive",
+      "why": "Agentverse flag: Clear Agentverse's \"unresponsive\" flag: reply fast to every chat"
+    },
+    {
+      "rule": "handle",
+      "why": "none: Set a custom @handle (max 20 chars) close to the agent's job"
+    },
+    {
+      "rule": "success_rate",
+      "why": "62%: Get real users chatting via ASI:One; answer every in-scope question well"
+    }
+  ]
+}
