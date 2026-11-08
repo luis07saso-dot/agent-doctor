@@ -279,11 +279,15 @@ The skills **start short on purpose**: the agent grows them from the scorer's fe
 
 ## Run 1 vs run N
 
-- **Task and score:** _TBD after counted runs_
-- **Run 1 → run N:** _TBD after counted runs_
-- **The change that did it:** _TBD after counted runs_
-- **What the agent learned:** _TBD after counted runs_
-- **What still fails:** _TBD after counted runs_
+- **Task and score:** 6 fixed Agentverse listings (4 train, 2 holdout). Score = 50% diagnosis (the failing rule ids must match Agent Doctor's own production scorer, `agent/scorer.py`) + 50% rewrite (6 checks from the Agentverse README guidelines). Same tasks, same scorer, every run.
+- **Run 1 → run N:** 51.44 → 97.81 → 99.17 (run 01 at `d7c4ab6`, run 02 at `b0bfd0a`, run 03 at `5fdb323`). Diagnosis 0.31 → 0.98, rewrite 0.72 → 1.00. Holdouts: 0.56 → 0.95 and 0.46 → 1.00. Tasks fully passed: 0/6 → 3/6 → 5/6.
+- **The change that did it:** `5942593` (`Agent-Session` commit after run 01): the agent rewrote its two skills and its instructions with an explicit threshold per rubric rule, the 6 exact README headings, and keywords taken word-for-word from the text. Two rounds (`8f709e2`, `b0bfd0a`, learned from counted attempts that failed the gate) removed false findings and made the reply always end with the JSON block. The last round (`5fdb323`, from run 02) fixed a rule it had broken itself: count the whole README, headings included.
+- **What the agent learned:** false findings cost score too. It added a step: for each finding, name the snapshot field and value that fails the rule, or drop it. And it corrected its own earlier README-length rule once the scorer flagged it.
+- **What still fails:** one holdout task (05) is not fully passed: a short starter-prompt list is flagged where Doctor only fails an empty one. The agent never sees holdout feedback, so it can't learn this. Tokens grew about 2.3× (177.8k → 404.8k) and run time about 2.7× (170 s → 453 s). ASI:One sometimes returns HTTP 500 (hit 3 of 5 gate-failed run-02 attempts); since run 03 the harness retries such turns (none needed in run 03).
+
+Four improve rounds in total, every one an `Agent-Session` commit that changes only `agent/` (plus, when learned from a counted run, that run's improve session export): `5942593` (from run 01), `8f709e2` and `b0bfd0a` (from two run-02 attempts that failed the evidence gate and were not counted), `5fdb323` (from run 02). `evals/` has not changed since run 01. The scorer is Agent Doctor's own production rubric plus the Agentverse README guidelines, so a higher score means a better Doctor, not a gamed metric — and the two holdout tasks improved as much as the training ones.
+
+Retries: asi1 sometimes returns HTTP 500, and TrueForge 0.184.2 doesn't retry 500s. So `run-evals` re-runs a task when its turn dies on a provider 429/5xx error, at most twice, as ASI:One's docs advise. Retried turns stay in `session.json`, are listed in `results.json` `retried`, and are checked by the evidence gate. Bad or unparsed answers are never retried. Runs 01 and 02 ran before this change and had no retries.
 
 ## How to run
 
