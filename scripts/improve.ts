@@ -10,6 +10,8 @@
 //
 // --from <dir>: read <dir>/results.json and write <dir>/improve-session.json instead of runs/run-NN/.
 // It never touches runs/ and needs --no-commit (a dry run is not a counted run to learn from).
+// Exception: tmp/failed-<ts> (a counted run that failed the evidence gate, same agent sha) may be
+// committed: only agent/ is staged; the commit names the attempt and keeps the Agent-Session line.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { basename, dirname, join, normalize, resolve } from "node:path";
@@ -147,9 +149,15 @@ async function main(): Promise<void> {
   let label: string;
   let nn = "";
   if (from) {
-    if (!flag("no-commit")) die("--from learns from a non-counted run: add --no-commit.");
     dir = resolve(process.cwd(), from);
-    label = `dry run ${basename(dir)}`;
+    const gated = /^failed-\d{8}T\d{6}Z$/.test(basename(dir)) && dirname(dir) === join(ROOT, "tmp");
+    if (!gated && !flag("no-commit")) die("--from learns from a non-counted run: add --no-commit.");
+    label = gated ? `attempt ${basename(dir)}` : `dry run ${basename(dir)}`;
+    if (gated && !flag("no-commit")) {
+      const sc = JSON.parse(readFileSync(join(dir, "score.json"), "utf8")) as { agent_commit?: string };
+      const same = sc.agent_commit && git("rev-parse", `${sc.agent_commit}:agent`) === git("rev-parse", "HEAD:agent");
+      if (!same) die(`${basename(dir)} ran at ${sc.agent_commit}, whose agent/ differs from HEAD: learn only from an attempt at the current agent.`);
+    }
   } else {
     const rows = existsSync(SUMMARY_CSV) ? readFileSync(SUMMARY_CSV, "utf8").trim().split("\n").slice(1).filter(Boolean) : [];
     if (!rows.length) die("No runs yet. Run npm run run-evals first.");
@@ -234,7 +242,12 @@ async function main(): Promise<void> {
   console.log(git("diff", "--stat", "--", "agent"));
 
   const message = `agent: learn from ${label}\n\n${learned || "(no summary given)"}\n\nAgent-Session: ${session.id}`;
-  if (from) {
+  if (from && !flag("no-commit")) {
+    git("add", "agent");
+    git("commit", "-q", "-m", message);
+    console.log(`\n✓ Committed the agent's change (Agent-Session: ${session.id}), learned from ${label}.`);
+    console.log("  Review it: git show    Drop it: git reset --hard HEAD~1    Then: npm run run-evals");
+  } else if (from) {
     console.log("\nFiles written, not committed (non-counted). Discard with: git checkout -- agent/instructions.md agent/skills");
   } else if (flag("no-commit")) {
     console.log(`\nFiles written, not committed. To commit:\n  git add agent runs && git commit -F- <<'EOF'\n${message}\nEOF`);
