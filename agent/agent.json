@@ -1,0 +1,9 @@
+{
+  "name": "code-reviewer",
+  "description": "Reviews a small code change and lists the real problems in it, as JSON.",
+  "model": {
+    "name": "anthropic/claude-sonnet-4-6",
+    "params": { "temperature": 0 }
+  },
+  "skill_mode": "inline"
+}

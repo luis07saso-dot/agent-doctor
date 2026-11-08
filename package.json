@@ -1,0 +1,29 @@
+{
+  "name": "agent-doctor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Starter repo for the Stranger Builds TrueForge challenge: an agent that gets better every time it runs.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.ts",
+    "run-evals": "node scripts/run-evals.ts",
+    "improve": "node scripts/improve.ts",
+    "export-session": "node scripts/export-session.ts",
+    "score": "node evals/score.ts",
+    "check-evidence": "node scripts/check-evidence.ts",
+    "scan": "node scripts/scrub.ts --scan",
+    "try-skills": "node scripts/try-skills.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@truefoundry/trueforge-sdk": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

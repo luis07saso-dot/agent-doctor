@@ -12,3 +12,8 @@ data/
 
 media/raw/
 doctor_memory_*
+
+# TrueForge (Node)
+node_modules/
+tmp/
+.claude/worktrees/
