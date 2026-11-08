@@ -289,6 +289,25 @@ Four improve rounds in total, every one an `Agent-Session` commit that changes o
 
 Retries: asi1 sometimes returns HTTP 500, and TrueForge 0.184.2 doesn't retry 500s. So `run-evals` re-runs a task when its turn dies on a provider 429/5xx error, at most twice, as ASI:One's docs advise. Retried turns stay in `session.json`, are listed in `results.json` `retried`, and are checked by the evidence gate. Bad or unparsed answers are never retried. Runs 01 and 02 ran before this change and had no retries.
 
+### Per run: train vs holdout, subagents, skills
+
+| Run | Agent commit | Score | Train (4 tasks) | Holdout (2 tasks) | Passed | `create_sub_agent` calls | Skill reads (rubric / rewrite) | Tool calls | Tokens |
+|---|---|---|---|---|---|---|---|---|---|
+| 01 | `d7c4ab6` | 51.44 | 51.81 | 50.70 | 0/6 | 12 | 6 / 6 | 33 | 177.8k |
+| 02 | `b0bfd0a` | 97.81 | 98.75 | 95.94 | 3/6 | 12 | 7 / 6 | 47 | 496.7k |
+| 03 | `5fdb323` | 99.17 | 100.00 | 97.50 | 5/6 | 12 | 6 / 6 | 38 | 404.8k |
+
+Train and holdout are the mean task score × 100 from `runs/run-NN/results.json`. Holdout tasks never reach the `improve` prompt. Subagent calls and skill reads come from each run's exported `session.json`, counted by `scripts/check-evidence.ts` (every one of the 6 turns needs at least one `create_sub_agent` call and one successful read of each skill's `SKILL.md`, or the run doesn't count). Tool calls and tokens are from `runs/summary.csv`. Check it yourself: `node scripts/check-evidence.ts runs/run-03/session.json --run runs/run-03`.
+
+### What this doesn't prove
+
+- **6 tasks is a small set.** They are synthetic listings, and only 2 are holdouts. The holdout gain is real but rests on 2 tasks.
+- **Near the ceiling.** Run 03 scores 99.17, so this task set can't show much more progress.
+- **One counted run per agent version.** Model output varies run to run; we did not repeat runs to measure that spread.
+- **The scorer shares the agent's view.** Diagnosis is graded against Agent Doctor's own rubric, whose weights and thresholds are our estimates: Agentverse publishes none (`agent/rubric.py`). A better score means the agent agrees with Doctor, not that Agentverse ranks the listing higher.
+- **Rewrite checks are structural.** They test sections, lengths, keywords that appear in the text, the owner's terms and starter prompts. No human or model judges how well the rewrite reads.
+- **Cost went up.** Tokens rose about 2.3× from run 01 to run 03; the scorer has no cost term.
+
 ## How to run
 
 You need Node.js 22.18+, git, and a model on TrueForge. We use ASI:One (`asi1`) as an OpenAI-compatible custom provider.
