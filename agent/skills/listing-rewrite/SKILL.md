@@ -15,8 +15,6 @@ description: How to rewrite an Agentverse listing (README, description, keywords
    - Metadata: version, category, source of data if any.
    - At least ~300 characters of plain prose outside headings; the README is the main search document.
    - Cover every capability in the owner's note; drop nothing. If the current profile is blank, write it all from the note.
-3. **Keywords**: 4-6 short phrases users would type; each must appear word-for-word in the README or description. Prefer plain terms ("flight status", "tide table") over invented compounds. Check each keyword against the text before returning.
+3. **Keywords**: 4-6 short phrases users would type; each must appear word-for-word in the README or description. Build them from words already in the owner's note or your README — no invented compounds — then check each against the text before returning.
 4. **Starter prompts**: 2-4 concrete questions a first-time user could send, each ending in "?", matching the README's examples.
-5. **Self-check before returning**: all four fields filled; 6 exact `##` headings in order; every keyword found word-for-word; 2-4 question-form prompts.
-
-<!-- Starts short on purpose: improve adds, sharpens or removes rules from the scorer's feedback. -->
+5. **Self-check before returning**: all four fields filled; 6 exact `##` headings in order; every keyword found word-for-word; 2-4 question-form prompts; no triple backticks in any field (the rewrite travels inside a JSON string).
