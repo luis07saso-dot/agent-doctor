@@ -1,9 +1,9 @@
 {
-  "name": "code-reviewer",
-  "description": "Reviews a small code change and lists the real problems in it, as JSON.",
+  "name": "agent-doctor",
+  "description": "Checks an Agentverse agent listing against the Agent Doctor rubric and rewrites its README, description, keywords and starter prompts.",
   "model": {
-    "name": "anthropic/claude-sonnet-4-6",
+    "name": "asi1/asi-1",
     "params": { "temperature": 0 }
   },
-  "skill_mode": "inline"
+  "skill_mode": "git"
 }
