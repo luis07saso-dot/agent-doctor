@@ -27,6 +27,7 @@ const emailOk = [
   (e: string) => e.endsWith(AT + "users.noreply.github.com"),
   (e: string) => e.endsWith(AT + "example.com"),
   (e: string) => e.endsWith(".invalid"),
+  (e: string) => new RegExp(AT + "[\\d.]+$").test(e), // a version pin (python@3.15, pkg@1.2.3): a numeric domain is never an address
 ];
 
 const fixed: { name: string; re: RegExp }[] = [
