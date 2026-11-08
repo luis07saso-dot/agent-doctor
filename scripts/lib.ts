@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TrueForge, TrueForgeApi } from "@truefoundry/trueforge-sdk";
+import type { Task } from "../evals/score.ts";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const AGENT_DIR = join(ROOT, "agent");
@@ -190,17 +191,8 @@ export async function findAgent(tf: TrueForge, name: string): Promise<TrueForgeA
 
 // ---------- tasks ----------
 
-export interface Task {
-  id: string;
-  title: string;
-  /** Holdout tasks are run and scored, but improve never shows them to the agent. */
-  holdout?: boolean;
-  language: string;
-  filename: string;
-  context: string;
-  code: string[];
-  expected: { line: number; categories: string[]; why: string }[];
-}
+// Task file schema (evals/tasks/NN-slug.json) lives with the scorer, so `npm run score` needs no SDK.
+export type { Task } from "../evals/score.ts";
 
 export function loadTasks(): Task[] {
   return readdirSync(TASKS_DIR)
@@ -209,20 +201,17 @@ export function loadTasks(): Task[] {
     .map((f) => JSON.parse(readFileSync(join(TASKS_DIR, f), "utf8")) as Task);
 }
 
-export function numbered(code: string[]): string {
-  const w = String(code.length).length;
-  return code.map((l, i) => `${String(i + 1).padStart(w)} | ${l}`).join("\n");
-}
-
 /** The message the agent gets for one task. Same text every run. */
 export function taskPrompt(t: Task): string {
   return [
-    `Review this change. File: \`${t.filename}\`. What the change does: ${t.context}`,
+    "Check this agent listing and fix its text.",
     "",
-    "Line numbers are on the left of the `|`.",
+    `Owner's note on what it does: ${t.job}`,
     "",
-    "```" + t.language,
-    numbered(t.code),
+    "Profile snapshot:",
+    "",
+    "```json",
+    JSON.stringify(t.profile, null, 2),
     "```",
   ].join("\n");
 }

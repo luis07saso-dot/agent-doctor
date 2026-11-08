@@ -1,0 +1,53 @@
+{
+  "id": "01-blank-template",
+  "title": "Blank template listing",
+  "holdout": false,
+  "profile": {
+    "name": "Agent",
+    "handle": "agent-7f3k2",
+    "description": "",
+    "readme": "",
+    "avatar": false,
+    "chat_protocol": true,
+    "status": "active",
+    "unresponsive": false,
+    "rating": 0.8,
+    "total_interactions": 14,
+    "recent_success_rate": null,
+    "recent_verified_interactions": 0,
+    "recent_eval_success_rate": null,
+    "domain": null,
+    "starter_prompts": []
+  },
+  "job": "Converts recipe ingredient lists between metric and US cup measures.",
+  "must_keep": [
+    "ingredient lists",
+    "cup measures"
+  ],
+  "expected": [
+    {
+      "rule": "readme_sections",
+      "why": "0/6 sections: Add README sections: Summary, Key features, Usage, Use cases, Limitations, Metadata"
+    },
+    {
+      "rule": "readme",
+      "why": "missing: Write a Markdown README (it is the main search document)"
+    },
+    {
+      "rule": "rating",
+      "why": "0.8/5: Raise rating: pass Agentverse Testing runs and get real ASI:One users"
+    },
+    {
+      "rule": "description",
+      "why": "missing: Add a one-line Agent Description"
+    },
+    {
+      "rule": "avatar",
+      "why": "missing: Upload an avatar"
+    },
+    {
+      "rule": "starter_prompts",
+      "why": "0: Add 2-4 starter prompts that match your README"
+    }
+  ]
+}
