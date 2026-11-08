@@ -8,12 +8,15 @@
 //   - unless --skills-only: every root turn has ≥ 1 create_sub_agent call
 //   - with --run <dir> (counted-run gate): root turns = tasks in evals/tasks/, every turn "done",
 //     every <dir>/results.json entry parsed: true
-// Prints: turns N · create_sub_agent X · threads Y · skill reads {a: n, b: m} · sandbox failures 0
+// Root turns that died on a model provider error (429/5xx, see lib.ts isTransientModelError) and
+// were re-run are skipped in every check above; with --run they must match results.json `retried`
+// exactly (no unlisted dead turn, no listed turn that isn't one).
+// Prints: turns N · create_sub_agent X · threads Y · skill reads {a: n, b: m} · sandbox failures 0 · model-error retries R
 
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { flag, loadTasks, option, readAgent, type SessionExport } from "./lib.ts";
+import { flag, isTransientModelError, loadTasks, option, readAgent, type SessionExport } from "./lib.ts";
 
 const SANDBOX_FAIL = "Sandbox initialization failed";
 
@@ -49,7 +52,26 @@ export function checkEvidence(exp: SessionExport, opts: EvidenceOptions = {}): E
   if (failures) reasons.push(`${failures} × "${SANDBOX_FAIL}"`);
   if (!skills.length) reasons.push("no skills under agent/skills/");
 
-  const roots = exp.turns.filter((t) => t.previousTurnId == null);
+  const allRoots = exp.turns.filter((t) => t.previousTurnId == null);
+  const deadTurn = (t: (typeof allRoots)[number]) => {
+    const st = t.state as { status?: string; message?: string } | undefined;
+    return isTransientModelError(st?.status ?? "", st?.message);
+  };
+  const dead = allRoots.filter(deadTurn);
+  const roots = allRoots.filter((t) => !deadTurn(t));
+
+  let results: { task_id: string; parsed: boolean; retried?: { turn_id: string }[] }[] | undefined;
+  const resultsFile = opts.runDir ? join(opts.runDir, "results.json") : "";
+  if (opts.runDir) {
+    if (!existsSync(resultsFile)) reasons.push(`missing ${resultsFile}`);
+    else results = JSON.parse(readFileSync(resultsFile, "utf8"));
+  }
+  if (results) {
+    const listed = new Set(results.flatMap((r) => (r.retried ?? []).map((x) => x.turn_id)));
+    const deadIds = new Set(dead.map((t) => t.id));
+    for (const id of deadIds) if (!listed.has(id)) reasons.push(`turn ${id}: model error, not listed as retried in results.json`);
+    for (const id of listed) if (!deadIds.has(id)) reasons.push(`turn ${id}: listed as retried but is not a model-error root turn`);
+  }
   let subCalls = 0;
   let threads = 0;
   const reads: Record<string, number> = Object.fromEntries(skills.map((s) => [s, 0]));
@@ -90,10 +112,7 @@ export function checkEvidence(exp: SessionExport, opts: EvidenceOptions = {}): E
   if (opts.runDir) {
     const tasks = loadTasks().length;
     if (roots.length !== tasks) reasons.push(`root turns ${roots.length} ≠ tasks ${tasks}`);
-    const file = join(opts.runDir, "results.json");
-    if (!existsSync(file)) reasons.push(`missing ${file}`);
-    else {
-      const results = JSON.parse(readFileSync(file, "utf8")) as { task_id: string; parsed: boolean }[];
+    if (results) {
       if (results.length !== tasks) reasons.push(`results ${results.length} ≠ tasks ${tasks}`);
       for (const r of results) if (r.parsed !== true) reasons.push(`task ${r.task_id}: reply not parsed`);
     }
@@ -102,7 +121,7 @@ export function checkEvidence(exp: SessionExport, opts: EvidenceOptions = {}): E
   const line =
     `turns ${roots.length} · create_sub_agent ${subCalls} · threads ${threads} · skill reads {` +
     skills.map((s) => `${s}: ${reads[s]}`).join(", ") +
-    `} · sandbox failures ${failures}`;
+    `} · sandbox failures ${failures} · model-error retries ${dead.length}`;
   return { ok: reasons.length === 0, reasons, line };
 }
 

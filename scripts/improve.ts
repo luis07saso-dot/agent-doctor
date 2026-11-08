@@ -32,6 +32,7 @@ import {
   runTurn,
   SUMMARY_CSV,
   type Task,
+  withModelRetry,
 } from "./lib.ts";
 import { writeClean } from "./scrub.ts";
 
@@ -203,7 +204,10 @@ async function main(): Promise<void> {
   await tf.sessions.update(session.id, { title: `improve from ${label}` });
   console.log(`Asking ${coach ? "the coach" : `"${agent.name}"`} to rewrite its playbook from ${failed.length} failed tasks (session ${session.id})…`);
 
-  const turn = await runTurn(tf, session.id, prompt, false);
+  // Model provider error (asi1 429/5xx): retry as a new root turn, so it doesn't chain on the dead one.
+  const { turn } = await withModelRetry((attempt) => runTurn(tf, session.id, prompt, attempt > 0), {
+    log: (m) => console.log(m.trim()),
+  });
   if (turn.status !== "done") die(`The turn ended with status ${turn.status}${turn.error ? `: ${turn.error}` : ""}`);
 
   // ---------- parse and check the change ----------

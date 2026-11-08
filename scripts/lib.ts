@@ -258,6 +258,50 @@ export async function runTurn(tf: TrueForge, sessionId: string, content: string,
 }
 
 /**
+ * A turn that died because the model provider failed (HTTP 429 or 5xx), not because of the agent.
+ * TrueForge 0.184.2 does not retry these itself: its model HTTP client retries only
+ * 408/429/503/521-523/530 (+409/502/520/524) and the AI SDK call runs with maxRetries 0, so one
+ * asi1 500 ends the whole turn as `[Model Error] Request failed (500): internal server error`.
+ * ASI:One's docs say: retry 429, 500 and 502 with backoff, a small number of times
+ * (https://docs.asi1.ai/documentation/build-with-asi-one/errors).
+ */
+export function isTransientModelError(status: string, error?: string): boolean {
+  return status === "error" && /^\[Model Error\] Request failed \((429|5\d\d)\)/.test(error ?? "");
+}
+
+/** A turn that was thrown away and run again because of a transient model error. */
+export interface RetriedTurn {
+  turn_id: string;
+  error: string;
+}
+
+/** Backoff before retry 1 and retry 2 (±25% jitter). Two retries, then the error stands. */
+export const MODEL_RETRY_DELAYS_MS = [10_000, 30_000];
+
+/**
+ * Run a turn; if it ends in a transient model error, wait and run the same input again as a
+ * fresh turn. Any other outcome (done, cut-off reply, unparsed JSON, other errors) is returned
+ * as is: only provider failures are retried, never a bad answer.
+ */
+export async function withModelRetry(
+  run: (attempt: number) => Promise<TurnResult>,
+  opts: { delaysMs?: number[]; sleep?: (ms: number) => Promise<void>; log?: (msg: string) => void } = {},
+): Promise<{ turn: TurnResult; retried: RetriedTurn[] }> {
+  const delays = opts.delaysMs ?? MODEL_RETRY_DELAYS_MS;
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const retried: RetriedTurn[] = [];
+  for (let attempt = 0; ; attempt++) {
+    const turn = await run(attempt);
+    // No turn id (stream ended before turn.created) = the gate can't match it to the session: don't retry.
+    if (!isTransientModelError(turn.status, turn.error) || !turn.turnId || attempt >= delays.length) return { turn, retried };
+    retried.push({ turn_id: turn.turnId, error: turn.error ?? "" });
+    const ms = Math.round(delays[attempt] * (0.75 + Math.random() * 0.5));
+    opts.log?.(`[${turn.error}; retry ${attempt + 1}/${delays.length} in ${Math.round(ms / 1000)}s] `);
+    await sleep(ms);
+  }
+}
+
+/**
  * Everything TrueForge keeps about a session: the session, every turn, and every turn's events.
  * There is no export endpoint, so we page through sessions.get / listTurns / listTurnEvents.
  * https://trueforge.dev/sessions and https://trueforge.dev/api-reference/agent-sessions/list-turn-events

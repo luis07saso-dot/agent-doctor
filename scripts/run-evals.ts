@@ -13,6 +13,7 @@
 // fails silently). Counted runs need HEAD on origin/main; dry runs need HEAD on any remote branch.
 // Every file written is scrubbed (scripts/scrub.ts). A counted run must also pass the evidence gate
 // (scripts/check-evidence.ts --run); if it fails, files go to tmp/failed-<ts>/ and nothing is committed.
+// A task whose turn dies on a model provider error (429/5xx) is re-run up to 2× (results.json `retried`).
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -36,6 +37,7 @@ import {
   SUMMARY_CSV,
   syncAgent,
   taskPrompt,
+  withModelRetry,
 } from "./lib.ts";
 
 const HEADER = "run,session_id,agent_commit,score,date_utc,tasks_passed,tasks_total,tokens,tool_calls,duration_s";
@@ -91,9 +93,15 @@ console.log(`  session ${session.id}`);
 const results = [];
 for (const task of tasks) {
   process.stdout.write(`  ${task.id.padEnd(24)} `);
-  const turn = await runTurn(tf, session.id, taskPrompt(task));
+  // A turn killed by a model provider error (asi1 429/5xx) is run again as a fresh root turn,
+  // at most twice (lib.ts withModelRetry). The dead turn stays in session.json and is listed in
+  // `retried`; check-evidence skips only turns listed there. Bad or unparsed answers are never retried.
+  // Dead turns' tokens/tool calls still count in score.json + summary.csv (real cost); duration includes the waits.
+  const { turn, retried } = await withModelRetry(() => runTurn(tf, session.id, taskPrompt(task)), {
+    log: (m) => process.stdout.write(m),
+  });
   const scored = scoreTask(task, turn.text);
-  results.push({ ...scored, turn_id: turn.turnId, status: turn.status, error: turn.error, reply: turn.text });
+  results.push({ ...scored, turn_id: turn.turnId, status: turn.status, error: turn.error, retried, reply: turn.text });
   console.log(`${turn.status === "done" ? "" : `[${turn.status}${turn.error ? `: ${turn.error}` : ""}] `}${scored.score.toFixed(2)}${scored.passed ? "  pass" : ""}`);
 }
 const durationS = Math.round((Date.now() - started) / 1000);
